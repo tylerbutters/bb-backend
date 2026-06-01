@@ -336,6 +336,39 @@ describe("checkGameAnswer", () => {
 		assert.match(calls[0].checkInstructions, /conjugation/)
 	})
 
+	it("caches generated-game AI feedback by answer", async () => {
+		clearLocalGameChallenges()
+		const prompt = await generateGamePrompt({
+			mode: "conjugations",
+			difficulty: "easy",
+			randomNumber: () => 0,
+		})
+		const calls = []
+		const payload = {
+			mode: "conjugations",
+			difficulty: "easy",
+			prompt: prompt.prompt,
+			answer: "私は寿司を食べる",
+			challengeId: prompt.challengeId,
+		}
+		const options = {
+			generateFeedback: async (feedbackPayload) => {
+				calls.push(feedbackPayload)
+				return "Use 食べた for the past tense."
+			},
+		}
+
+		const firstResult = await generateLocalGameAnswerFeedback(payload, options)
+		const secondResult = await generateLocalGameAnswerFeedback(payload, options)
+
+		assert.deepEqual(firstResult, {
+			correct: false,
+			feedback: "Use 食べた for the past tense.",
+		})
+		assert.deepEqual(secondResult, firstResult)
+		assert.equal(calls.length, 1)
+	})
+
 	it("falls back to AI when a generated challenge is no longer available", async () => {
 		clearLocalGameChallenges()
 		const calls = []

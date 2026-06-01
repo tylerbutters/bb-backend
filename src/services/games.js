@@ -9,8 +9,10 @@ import {
 	normalizeJapaneseAnswerText,
 } from "./localGamePromptGeneration/localAnswerText.js"
 import {
+	cacheLocalGameChallengeFeedback,
 	cacheLocalGameChallengeResult,
 	findLocalGameChallenge,
+	getCachedLocalGameChallengeFeedback,
 	getCachedLocalGameChallengeResult,
 	saveLocalGameChallenge,
 } from "./localGameChallenges.js"
@@ -305,6 +307,9 @@ export async function generateLocalGameAnswerFeedback(
 		return localResult
 	}
 
+	const cachedFeedbackResult = getCachedLocalGameChallengeFeedback(challenge, answerKey)
+	if (cachedFeedbackResult) return cachedFeedbackResult
+
 	const fallbackFeedback = localGeneratedGameFeedback(mode, challenge)
 
 	try {
@@ -319,6 +324,9 @@ export async function generateLocalGameAnswerFeedback(
 		const result = {
 			correct: false,
 			feedback: feedback || fallbackFeedback,
+		}
+		if (feedback) {
+			cacheLocalGameChallengeFeedback(challenge, answerKey, result)
 		}
 		cacheLocalGameChallengeResult(challenge, answerKey, result)
 

@@ -27,6 +27,7 @@ export function saveLocalGameChallenge({
 		expectedAnswerParts,
 		expectedAnswerKanaParts,
 		checkResultsByAnswer: new Map(),
+		feedbackResultsByAnswer: new Map(),
 		expiresAt: Date.now() + CHALLENGE_TTL_MS,
 	}
 
@@ -63,6 +64,17 @@ export function getCachedLocalGameChallengeResult(challenge, answerKey) {
 
 export function cacheLocalGameChallengeResult(challenge, answerKey, result) {
 	challenge?.checkResultsByAnswer?.set(answerKey, { ...result })
+}
+
+export function getCachedLocalGameChallengeFeedback(challenge, answerKey) {
+	const cachedResult = challenge?.feedbackResultsByAnswer?.get(answerKey)
+	if (!cachedResult) return null
+
+	return { ...cachedResult }
+}
+
+export function cacheLocalGameChallengeFeedback(challenge, answerKey, result) {
+	challenge?.feedbackResultsByAnswer?.set(answerKey, { ...result })
 }
 
 export function clearLocalGameChallenges() {
