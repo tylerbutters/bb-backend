@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { HttpError } from "../errors.js"
-import { checkSandboxSentence, generateGamePrompt, validateConjugationPrompt } from "./games.js"
+import {
+	checkSandboxSentence,
+	generateGamePrompt,
+	getGameCheckInstructions,
+	validateConjugationPrompt,
+} from "./games.js"
 
 describe("validateConjugationPrompt", () => {
 	it("keeps the English prompt and base-form Japanese kanji/kana word data", () => {
@@ -261,6 +266,44 @@ describe("generateGamePrompt", () => {
 		assert.equal(prompt.profile.vocabLevel, "easy")
 		assert.equal(prompt.profile.conjugationLevel, "hard")
 		assert.doesNotThrow(() => validateConjugationPrompt(prompt, { difficulty: "hard" }))
+	})
+})
+
+describe("getGameCheckInstructions", () => {
+	it("keeps translate checks focused on full sentence meaning", () => {
+		const instructions = getGameCheckInstructions("translate")
+
+		assert.match(instructions, /Compare the English sentence/)
+		assert.doesNotMatch(instructions, /focused only/)
+	})
+
+	it("keeps generated-element games focused on the practiced skill", () => {
+		const expectedFocus = {
+			conjugations: {
+				focus: /focused only on conjugation/,
+				ignoredIssue: /particles/,
+			},
+			"fix sentence": {
+				focus: /focused only on fixing the one wrong particle or word/,
+				ignoredIssue: /unrelated grammar/,
+			},
+			particles: {
+				focus: /focused only on particle choice/,
+				ignoredIssue: /conjugation/,
+			},
+			reorder: {
+				focus: /focused only on word order/,
+				ignoredIssue: /particles/,
+			},
+		}
+
+		for (const [mode, { focus, ignoredIssue }] of Object.entries(expectedFocus)) {
+			const instructions = getGameCheckInstructions(mode)
+
+			assert.match(instructions, focus)
+			assert.match(instructions, ignoredIssue)
+			assert.match(instructions, /Do not mark incorrect or give feedback/)
+		}
 	})
 })
 

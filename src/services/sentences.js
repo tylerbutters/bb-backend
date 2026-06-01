@@ -16,7 +16,7 @@ async function createResponse(payload) {
 
 	try {
 		return await openai.responses.create({
-			model: "gpt-4.1-nano",
+			model: "gpt-5.4-mini",
 			...payload,
 		})
 	} catch (error) {

@@ -17,24 +17,32 @@ const gameCheckInstructions = {
 	conjugations: [
 		"The prompt is an English sentence that requires a specific Japanese verb or adjective conjugation.",
 		"The answer is the learner's Japanese sentence.",
-		"Mark correct when the Japanese sentence naturally communicates the English sentence and uses the required conjugation.",
+		"This exercise is focused only on conjugation.",
+		"Mark correct when the answer uses the required conjugation on the intended verb or adjective.",
+		"Do not mark incorrect or give feedback about particles, word order, vocabulary, or other non-conjugation issues unless they make the target conjugation impossible to identify.",
 	].join(" "),
 	"fix sentence": [
 		"The prompt is an English target meaning.",
 		"The learner was given Japanese sentence elements in normal order with one wrong particle or word.",
 		"The answer is the learner's corrected Japanese sentence.",
-		"Mark correct when the answer is natural Japanese and matches the target meaning.",
+		"This exercise is focused only on fixing the one wrong particle or word.",
+		"Mark correct when the answer fixes that focused mistake and still communicates the target meaning.",
+		"Do not mark incorrect or give feedback about unrelated grammar, style, word order, or optional phrasing unless they prevent identifying the focused fix.",
 	].join(" "),
 	particles: [
 		"The prompt is an English target meaning for a Japanese sentence with missing particles.",
 		"The answer is the learner's completed Japanese sentence.",
-		"Mark correct when the sentence naturally communicates the target meaning and uses fitting particles.",
+		"This exercise is focused only on particle choice.",
+		"Mark correct when the learner chose fitting particles for the provided sentence elements.",
+		"Do not mark incorrect or give feedback about conjugation, word order, vocabulary, or other non-particle issues unless they make the particle choices impossible to identify.",
 	].join(" "),
 	reorder: [
 		"The prompt is an English target meaning.",
 		"The learner was given the Japanese sentence elements in the wrong order.",
 		"The answer is the learner's reordered Japanese sentence.",
-		"Mark correct when the answer is natural Japanese and matches the target meaning.",
+		"This exercise is focused only on word order.",
+		"Mark correct when the provided sentence elements are in a natural order for the target meaning.",
+		"Do not mark incorrect or give feedback about particles, conjugation, vocabulary, or other non-order issues unless they make the word order impossible to identify.",
 	].join(" "),
 }
 
