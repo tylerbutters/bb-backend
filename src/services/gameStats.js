@@ -3,10 +3,10 @@ import { HttpError } from "../errors.js"
 
 export const TRACKED_GAME_MODES = [
 	{ mode: "translate", label: "Translate" },
-	{ mode: "conjugations", label: "Conjugations" },
-	{ mode: "fix sentence", label: "Fix sentence" },
+	{ mode: "conjugations", label: "Conjugate" },
+	{ mode: "fix sentence", label: "Fix mistakes" },
 	{ mode: "particles", label: "Particles" },
-	{ mode: "reorder", label: "Reorder" },
+	{ mode: "reorder", label: "Word order" },
 ]
 export const GAME_DIFFICULTIES = ["easy", "medium", "hard"]
 export const GAME_STAT_FILTERS = ["all", ...GAME_DIFFICULTIES]

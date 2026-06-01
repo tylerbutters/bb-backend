@@ -232,7 +232,7 @@ describe("admin routes", () => {
 				id: 9,
 				challengeId: "1e5eb8e7-f91a-4c61-8f37-62b1a27ddf95",
 				mode: "conjugations",
-				label: "Conjugations",
+				label: "Conjugate",
 				difficulty: "hard",
 				prompt: "Conjugate 食べる.",
 				answer: "食べます",

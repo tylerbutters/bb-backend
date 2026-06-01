@@ -281,7 +281,7 @@ describe("getUserGameStats", () => {
 			},
 			{
 				mode: "conjugations",
-				label: "Conjugations",
+				label: "Conjugate",
 				totalGames: 0,
 				correct: 0,
 				incorrect: 0,
@@ -289,7 +289,7 @@ describe("getUserGameStats", () => {
 			},
 			{
 				mode: "fix sentence",
-				label: "Fix sentence",
+				label: "Fix mistakes",
 				totalGames: 0,
 				correct: 0,
 				incorrect: 0,
@@ -305,7 +305,7 @@ describe("getUserGameStats", () => {
 			},
 			{
 				mode: "reorder",
-				label: "Reorder",
+				label: "Word order",
 				totalGames: 1,
 				correct: 1,
 				incorrect: 0,
