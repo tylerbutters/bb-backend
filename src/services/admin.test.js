@@ -73,8 +73,8 @@ describe("admin service", () => {
 								mode: "translate",
 								difficulty: "easy",
 								total_games: "2",
-								won: "1",
-								failed: "1",
+								correct: "1",
+								incorrect: "1",
 							},
 						],
 					}
@@ -88,8 +88,8 @@ describe("admin service", () => {
 		assert.deepEqual(result.user, user)
 		assert.deepEqual(result.stats.total, {
 			totalGames: 2,
-			won: 1,
-			failed: 1,
+			correct: 1,
+			incorrect: 1,
 			accuracy: 50,
 		})
 	})

@@ -86,19 +86,25 @@ function createQuota({ plan, used, resetsAt }) {
 	}
 }
 
-function calculateAccuracy(won, totalGames) {
+function calculateAccuracy(correct, totalGames) {
 	if (!totalGames) return 0
-	return Math.round((won / totalGames) * 100)
+	return Math.round((correct / totalGames) * 100)
 }
 
-function createStats({ mode, label, totalGames = 0, won = 0, failed = 0 } = {}) {
+function createStats({
+	mode,
+	label,
+	totalGames = 0,
+	correct = 0,
+	incorrect = 0,
+} = {}) {
 	return {
 		...(mode ? { mode } : {}),
 		...(label ? { label } : {}),
 		totalGames,
-		won,
-		failed,
-		accuracy: calculateAccuracy(won, totalGames),
+		correct,
+		incorrect,
+		accuracy: calculateAccuracy(correct, totalGames),
 	}
 }
 
@@ -206,18 +212,18 @@ function createModeAccumulator() {
 	return new Map(
 		TRACKED_GAME_MODES.map(({ mode }) => [
 			mode,
-			{ totalGames: 0, won: 0, failed: 0 },
+			{ totalGames: 0, correct: 0, incorrect: 0 },
 		]),
 	)
 }
 
-function addStats(statsByMode, { mode, totalGames, won, failed }) {
+function addStats(statsByMode, { mode, totalGames, correct, incorrect }) {
 	const stats = statsByMode.get(mode)
 	if (!stats) return
 
 	stats.totalGames += totalGames
-	stats.won += won
-	stats.failed += failed
+	stats.correct += correct
+	stats.incorrect += incorrect
 }
 
 function createStatsGroup(statsByMode) {
@@ -231,10 +237,10 @@ function createStatsGroup(statsByMode) {
 	const total = games.reduce(
 		(summary, game) => ({
 			totalGames: summary.totalGames + game.totalGames,
-			won: summary.won + game.won,
-			failed: summary.failed + game.failed,
+			correct: summary.correct + game.correct,
+			incorrect: summary.incorrect + game.incorrect,
 		}),
-		{ totalGames: 0, won: 0, failed: 0 },
+		{ totalGames: 0, correct: 0, incorrect: 0 },
 	)
 
 	return {
@@ -316,8 +322,8 @@ export async function getUserGameStats(
 		SELECT mode,
 			difficulty,
 			COUNT(*) AS total_games,
-			COUNT(*) FILTER (WHERE correct) AS won,
-			COUNT(*) FILTER (WHERE NOT correct) AS failed
+			COUNT(*) FILTER (WHERE correct) AS correct,
+			COUNT(*) FILTER (WHERE NOT correct) AS incorrect
 		FROM user_game_results
 		WHERE user_id = $1
 			${visibilityCondition}
@@ -336,8 +342,8 @@ export async function getUserGameStats(
 		const rowStats = {
 			mode: row.mode,
 			totalGames: normalizeCount(row?.total_games),
-			won: normalizeCount(row?.won),
-			failed: normalizeCount(row?.failed),
+			correct: normalizeCount(row?.correct),
+			incorrect: normalizeCount(row?.incorrect),
 		}
 
 		addStats(statsByFilter.get("all"), rowStats)
