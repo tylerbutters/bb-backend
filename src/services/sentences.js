@@ -6,6 +6,9 @@ const openai = new OpenAI({
 	apiKey: process.env.OPENAI_API_KEY,
 })
 
+const DEFAULT_FEEDBACK_MODEL = "gpt-5.4-mini"
+const DEFAULT_FEEDBACK_MAX_OUTPUT_TOKENS = 120
+
 async function createResponse(payload) {
 	if (!process.env.OPENAI_API_KEY) {
 		throw new HttpError(503, "AI service is not configured.", {
@@ -16,12 +19,27 @@ async function createResponse(payload) {
 
 	try {
 		return await openai.responses.create({
-			model: "gpt-5.4-mini",
+			model: process.env.OPENAI_FEEDBACK_MODEL || DEFAULT_FEEDBACK_MODEL,
+			reasoning: {
+				effort: process.env.OPENAI_FEEDBACK_REASONING_EFFORT || "low",
+			},
+			text: {
+				verbosity: process.env.OPENAI_FEEDBACK_VERBOSITY || "low",
+			},
+			max_output_tokens: feedbackMaxOutputTokens(),
 			...payload,
 		})
 	} catch (error) {
 		throw normalizeOpenAIError(error)
 	}
+}
+
+function feedbackMaxOutputTokens() {
+	const configuredValue = Number(process.env.OPENAI_FEEDBACK_MAX_OUTPUT_TOKENS)
+
+	return Number.isFinite(configuredValue) && configuredValue > 0
+		? configuredValue
+		: DEFAULT_FEEDBACK_MAX_OUTPUT_TOKENS
 }
 
 function normalizeOpenAIError(error) {
@@ -75,6 +93,36 @@ export async function checkJapaneseGameAnswer({
 			logMessage: `Invalid JSON from OpenAI: ${rawText}`,
 		})
 	}
+}
+
+export async function generateJapaneseGameFeedback({
+	gameTitle,
+	prompt,
+	answer,
+	expectedAnswer,
+	answerDiff,
+	checkInstructions,
+}) {
+	const response = await createResponse({
+		instructions: [
+			`You give beginner Japanese ${gameTitle} feedback.`,
+			checkInstructions,
+			"The app has already determined this answer is incorrect.",
+			"The input includes the expected answer and a local diff of the likely mistake.",
+			"Return only the feedback sentence as plain text.",
+			"Do not return JSON, markdown, labels, or extra commentary.",
+			"Give one concise, actionable explanation in English.",
+			"Focus only on the practiced skill for this game.",
+		].join(" "),
+		input: JSON.stringify({
+			prompt,
+			answer,
+			expectedAnswer,
+			answerDiff,
+		}),
+	})
+
+	return String(response.output_text || "").trim()
 }
 
 export async function checkJapaneseTranslation({ englishSentence, japaneseSentence }) {

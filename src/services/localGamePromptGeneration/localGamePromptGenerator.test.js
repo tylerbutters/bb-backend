@@ -2,6 +2,11 @@ import assert from "node:assert/strict"
 import fs from "node:fs"
 import { describe, it } from "node:test"
 import { validateConjugationPrompt } from "../games.js"
+import {
+	buildAcceptedJapaneseAnswerTexts,
+	buildJapaneseAnswerFeedbackParts,
+	buildJapaneseAnswerFeedbackText,
+} from "./localAnswerText.js"
 import { LOCAL_PROMPT_VOCABULARY } from "./promptData/localVocabulary.js"
 import { generateLocalGamePrompt } from "./localGamePromptGenerator.js"
 import { generateSentenceFromFrame } from "./sentenceFrames/index.js"
@@ -380,6 +385,73 @@ describe("generateLocalGamePrompt", () => {
 	it("returns null for modes without a local generator", () => {
 		assert.equal(generateLocalGamePrompt({ mode: "sandbox" }), null)
 		assert.equal(generateLocalGamePrompt({ mode: "shuffle" }), null)
+	})
+})
+
+describe("buildAcceptedJapaneseAnswerTexts", () => {
+	it("renders generated Japanese chunks into answer strings", () => {
+		const easySentence = generateSentenceFromFrame({
+			difficulty: "easy",
+			randomNumber: () => FIRST_RANDOM_VALUE,
+		})
+		const mediumSentence = generateSentenceFromFrame({
+			difficulty: "medium",
+			randomNumber: () => FIRST_RANDOM_VALUE,
+		})
+		const hardSentence = generateSentenceFromFrame({
+			difficulty: "hard",
+			randomNumber: () => LAST_RANDOM_VALUE,
+		})
+
+		assert.deepEqual(buildAcceptedJapaneseAnswerTexts(easySentence.japaneseTranslation), [
+			"私は寿司を食べる",
+			"わたしはすしをたべる",
+		])
+		assert.deepEqual(buildAcceptedJapaneseAnswerTexts(mediumSentence.japaneseTranslation), [
+			"私は学校で日本語を勉強した",
+			"わたしはがっこうでにほんごをべんきょうした",
+		])
+		assert.deepEqual(buildAcceptedJapaneseAnswerTexts(hardSentence.japaneseTranslation), [
+			"友達は学生に映画館にいかせられた",
+			"ともだちはがくせいにえいがかんにいかせられた",
+		])
+	})
+
+	it("renders sampled sentence frame answers without missing text", () => {
+		for (const difficulty of ["easy", "medium", "hard"]) {
+			for (const randomValue of [0, 0.2, 0.4, 0.6, 0.8, LAST_RANDOM_VALUE]) {
+				const sentence = generateSentenceFromFrame({
+					difficulty,
+					randomNumber: () => randomValue,
+				})
+				const answers = buildAcceptedJapaneseAnswerTexts(sentence.japaneseTranslation)
+
+				assert.notEqual(answers.length, 0)
+				for (const answer of answers) {
+					assert.equal(answer.includes("undefined"), false)
+					assert.notEqual(answer.length, 0)
+				}
+			}
+		}
+	})
+})
+
+describe("buildJapaneseAnswerFeedbackText", () => {
+	it("renders a readable expected answer with sentence chunks separated", () => {
+		const sentence = generateSentenceFromFrame({
+			difficulty: "easy",
+			randomNumber: () => FIRST_RANDOM_VALUE,
+		})
+
+		assert.equal(
+			buildJapaneseAnswerFeedbackText(sentence.japaneseTranslation),
+			"私は 寿司を 食べる",
+		)
+		assert.deepEqual(buildJapaneseAnswerFeedbackParts(sentence.japaneseTranslation), [
+			"私は",
+			"寿司を",
+			"食べる",
+		])
 	})
 })
 

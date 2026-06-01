@@ -12,6 +12,22 @@ export function generateSentenceGamePrompt({
 	gameProfile,
 	randomNumber = Math.random,
 }) {
+	const generatedChallenge = generateSentenceGameChallenge({
+		mode,
+		difficulty,
+		gameProfile,
+		randomNumber,
+	})
+
+	return generatedChallenge?.prompt || null
+}
+
+export function generateSentenceGameChallenge({
+	mode,
+	difficulty = "easy",
+	gameProfile,
+	randomNumber = Math.random,
+}) {
 	const generatedSentence =
 		mode === "conjugations"
 			? generateSentenceWithConjugationFromFrame({ difficulty, randomNumber })
@@ -22,7 +38,27 @@ export function generateSentenceGamePrompt({
 		templateId: generatedSentence.templateId,
 		gameProfile,
 	}
+	const expectedJapaneseTranslation =
+		mode === "translate"
+			? null
+			: generatedSentence.japaneseTranslation
+	const prompt = buildPromptForMode({
+		mode,
+		difficulty,
+		randomNumber,
+		generatedSentence,
+		basePrompt,
+	})
 
+	if (!prompt) return null
+
+	return {
+		prompt,
+		expectedJapaneseTranslation,
+	}
+}
+
+function buildPromptForMode({ mode, difficulty, randomNumber, generatedSentence, basePrompt }) {
 	switch (mode) {
 		case "translate":
 			return basePrompt

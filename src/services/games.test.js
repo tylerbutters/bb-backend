@@ -1,8 +1,11 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { HttpError } from "../errors.js"
+import { clearLocalGameChallenges } from "./localGameChallenges.js"
 import {
+	checkGameAnswer,
 	checkSandboxSentence,
+	generateLocalGameAnswerFeedback,
 	generateGamePrompt,
 	getGameCheckInstructions,
 	validateConjugationPrompt,
@@ -18,12 +21,12 @@ describe("validateConjugationPrompt", () => {
 					{ kanji: "学校", kana: "がっこう", particle: "に" },
 					{ kanji: "行く", kana: "いく" },
 				],
-				}),
-				{
-					prompt: "He wanted to go to school.",
-					japaneseTranslation: [
-						{ kanji: "彼", kana: "かれ", particle: "は" },
-						{ kanji: "学校", kana: "がっこう", particle: "に" },
+			}),
+			{
+				prompt: "He wanted to go to school.",
+				japaneseTranslation: [
+					{ kanji: "彼", kana: "かれ", particle: "は" },
+					{ kanji: "学校", kana: "がっこう", particle: "に" },
 					{ kanji: "行く", kana: "いく" },
 				],
 			},
@@ -32,12 +35,12 @@ describe("validateConjugationPrompt", () => {
 
 	it("rejects incomplete structured prompts", () => {
 		assert.throws(
-				() =>
-					validateConjugationPrompt({
-						prompt: "Conjugate 食べる.",
-						japaneseTranslation: [{ kanji: "食べます" }],
-					}),
-				(error) => {
+			() =>
+				validateConjugationPrompt({
+					prompt: "Conjugate 食べる.",
+					japaneseTranslation: [{ kanji: "食べます" }],
+				}),
+			(error) => {
 				assert.equal(error instanceof HttpError, true)
 				assert.equal(error.status, 502)
 				assert.equal(error.code, "AI_INVALID_RESPONSE")
@@ -48,12 +51,12 @@ describe("validateConjugationPrompt", () => {
 
 	it("rejects standalone particles that should be attached to nouns", () => {
 		assert.throws(
-				() =>
-					validateConjugationPrompt({
-						prompt: "I want to eat sushi.",
-						japaneseTranslation: [
-							{ kanji: "私", kana: "わたし" },
-							{ kanji: "は", kana: "は" },
+			() =>
+				validateConjugationPrompt({
+					prompt: "I want to eat sushi.",
+					japaneseTranslation: [
+						{ kanji: "私", kana: "わたし" },
+						{ kanji: "は", kana: "は" },
 						{ kanji: "食べる", kana: "たべる" },
 						{ kanji: "を", kana: "を" },
 						{ kanji: "寿司", kana: "すし" },
@@ -189,6 +192,171 @@ describe("getGameCheckInstructions", () => {
 			assert.match(instructions, ignoredIssue)
 			assert.match(instructions, /Do not mark incorrect or give feedback/)
 		}
+	})
+})
+
+describe("checkGameAnswer", () => {
+	it("checks generated particle games locally without calling AI", async () => {
+		clearLocalGameChallenges()
+		const prompt = await generateGamePrompt({
+			mode: "particles",
+			difficulty: "easy",
+			randomNumber: () => 0,
+		})
+
+		const result = await checkGameAnswer(
+			{
+				mode: "particles",
+				difficulty: "easy",
+				prompt: prompt.prompt,
+				answer: "私は寿司を食べる",
+				challengeId: prompt.challengeId,
+			},
+			{
+				checkAnswer: async () => {
+					throw new Error("AI should not be called for generated particle checks")
+				},
+			},
+		)
+
+		assert.deepEqual(result, { correct: true, feedback: "" })
+	})
+
+	it("checks generated conjugation games against the conjugated answer", async () => {
+		clearLocalGameChallenges()
+		const prompt = await generateGamePrompt({
+			mode: "conjugations",
+			difficulty: "easy",
+			randomNumber: () => 0,
+		})
+
+		const correctResult = await checkGameAnswer(
+			{
+				mode: "conjugations",
+				difficulty: "easy",
+				prompt: prompt.prompt,
+				answer: "私は寿司を食べた",
+				challengeId: prompt.challengeId,
+			},
+			{
+				checkAnswer: async () => {
+					throw new Error("AI should not be called for generated conjugation checks")
+				},
+			},
+		)
+		const incorrectResult = await checkGameAnswer(
+			{
+				mode: "conjugations",
+				difficulty: "easy",
+				prompt: prompt.prompt,
+				answer: "私は寿司を食べる",
+				challengeId: prompt.challengeId,
+			},
+			{
+				checkAnswer: async () => {
+					throw new Error("AI should not be called for generated conjugation checks")
+				},
+			},
+		)
+
+		assert.deepEqual(correctResult, { correct: true, feedback: "" })
+		assert.equal(incorrectResult.correct, false)
+		assert.match(incorrectResult.feedback, /Correct sentence: 私は 寿司を 食べた/)
+		assert.match(incorrectResult.feedback, /conjugation/)
+	})
+
+	it("uses AI checks for translate games and caches repeated challenge answers", async () => {
+		clearLocalGameChallenges()
+		const prompt = await generateGamePrompt({
+			mode: "translate",
+			difficulty: "easy",
+			randomNumber: () => 0,
+		})
+		const calls = []
+		const payload = {
+			mode: "translate",
+			difficulty: "easy",
+			prompt: prompt.prompt,
+			answer: "私は寿司を食べる",
+			challengeId: prompt.challengeId,
+		}
+		const options = {
+			checkAnswer: async (checkPayload) => {
+				calls.push(checkPayload)
+				return { correct: true, feedback: "Good." }
+			},
+		}
+
+		const firstResult = await checkGameAnswer(payload, options)
+		const secondResult = await checkGameAnswer(payload, options)
+
+		assert.deepEqual(firstResult, { correct: true, feedback: "Good." })
+		assert.deepEqual(secondResult, { correct: true, feedback: "Good." })
+		assert.equal(calls.length, 1)
+	})
+
+	it("uses AI for incorrect generated-game feedback while keeping local correctness", async () => {
+		clearLocalGameChallenges()
+		const prompt = await generateGamePrompt({
+			mode: "conjugations",
+			difficulty: "easy",
+			randomNumber: () => 0,
+		})
+		const calls = []
+
+		const result = await generateLocalGameAnswerFeedback(
+			{
+				mode: "conjugations",
+				difficulty: "easy",
+				prompt: prompt.prompt,
+				answer: "私は寿司を食べる",
+				challengeId: prompt.challengeId,
+			},
+			{
+				generateFeedback: async (payload) => {
+					calls.push(payload)
+					return "Use 食べた for the past tense."
+				},
+			},
+		)
+
+		assert.deepEqual(result, {
+			correct: false,
+			feedback: "Use 食べた for the past tense.",
+		})
+		assert.equal(calls.length, 1)
+		assert.equal(calls[0].expectedAnswer, "私は 寿司を 食べた")
+		assert.deepEqual(calls[0].answerDiff, {
+			expectedAnswer: "私は 寿司を 食べた",
+			submittedAnswer: "私は寿司を食べる",
+			matchedPrefix: "私は 寿司を",
+			expectedChunk: "食べた",
+			submittedChunk: "食べる",
+		})
+		assert.match(calls[0].checkInstructions, /conjugation/)
+	})
+
+	it("falls back to AI when a generated challenge is no longer available", async () => {
+		clearLocalGameChallenges()
+		const calls = []
+		const result = await checkGameAnswer(
+			{
+				mode: "reorder",
+				difficulty: "easy",
+				prompt: "I eat sushi.",
+				answer: "私は寿司を食べる",
+				challengeId: "1e5eb8e7-f91a-4c61-8f37-62b1a27ddf95",
+			},
+			{
+				checkAnswer: async (checkPayload) => {
+					calls.push(checkPayload)
+					return { correct: true, feedback: "Fallback." }
+				},
+			},
+		)
+
+		assert.deepEqual(result, { correct: true, feedback: "Fallback." })
+		assert.equal(calls.length, 1)
 	})
 })
 

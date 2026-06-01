@@ -296,6 +296,25 @@ export async function recordGameResult(
 	return result.rowCount > 0
 }
 
+export async function updateGameResultFeedback(
+	{ userId, challengeId, feedback },
+	{ query = (sql, params) => db.query(sql, params) } = {},
+) {
+	if (!userId || !challengeId) return false
+
+	const result = await query(
+		`
+		UPDATE user_game_results
+		SET feedback = $3
+		WHERE user_id = $1
+			AND challenge_id = $2
+		`,
+		[userId, challengeId, feedback || null],
+	)
+
+	return result.rowCount > 0
+}
+
 export async function getUserGameStats(
 	userId,
 	{

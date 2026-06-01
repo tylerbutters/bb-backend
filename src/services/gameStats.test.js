@@ -6,6 +6,7 @@ import {
 	getUserGameQuota,
 	getUserGameStats,
 	recordGameResult,
+	updateGameResultFeedback,
 } from "./gameStats.js"
 
 describe("recordGameResult", () => {
@@ -59,6 +60,34 @@ describe("recordGameResult", () => {
 		)
 
 		assert.equal(inserted, false)
+	})
+})
+
+describe("updateGameResultFeedback", () => {
+	it("updates feedback for an already recorded challenge result", async () => {
+		const calls = []
+		const updated = await updateGameResultFeedback(
+			{
+				userId: 12,
+				challengeId: "1e5eb8e7-f91a-4c61-8f37-62b1a27ddf95",
+				feedback: "Use 食べた for the past tense.",
+			},
+			{
+				query: async (sql, params) => {
+					calls.push({ sql, params })
+					return { rowCount: 1 }
+				},
+			},
+		)
+
+		assert.equal(updated, true)
+		assert.equal(calls.length, 1)
+		assert.match(calls[0].sql, /UPDATE user_game_results/)
+		assert.deepEqual(calls[0].params, [
+			12,
+			"1e5eb8e7-f91a-4c61-8f37-62b1a27ddf95",
+			"Use 食べた for the past tense.",
+		])
 	})
 })
 

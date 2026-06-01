@@ -1,4 +1,7 @@
-import { generateSentenceGamePrompt } from "./sentencePromptBuilder.js"
+import {
+	generateSentenceGameChallenge,
+	generateSentenceGamePrompt,
+} from "./sentencePromptBuilder.js"
 
 const SENTENCE_FRAME_GAME_MODES = new Set([
 	"translate",
@@ -105,6 +108,25 @@ export function generateLocalGamePrompt({
 }) {
 	if (SENTENCE_FRAME_GAME_MODES.has(mode)) {
 		return generateSentenceGamePrompt({
+			mode,
+			difficulty,
+			gameProfile: getGameProfile(mode, difficulty),
+			randomNumber,
+		})
+	}
+
+	return null
+}
+
+// Includes server-only expected answer data. Routes should send only challenge.prompt
+// to the client and keep the expected answer data in backend storage.
+export function generateLocalGameChallenge({
+	mode,
+	difficulty = "easy",
+	randomNumber = Math.random,
+}) {
+	if (SENTENCE_FRAME_GAME_MODES.has(mode)) {
+		return generateSentenceGameChallenge({
 			mode,
 			difficulty,
 			gameProfile: getGameProfile(mode, difficulty),

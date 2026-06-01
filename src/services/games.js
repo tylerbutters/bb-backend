@@ -1,8 +1,31 @@
 import { randomUUID } from "node:crypto"
 import { HttpError } from "../errors.js"
 import { GAME_MODES } from "../gameModes.js"
-import { generateLocalGamePrompt } from "./localGamePromptGeneration/localGamePromptGenerator.js"
-import { checkJapaneseGameAnswer } from "./sentences.js"
+import { generateLocalGameChallenge } from "./localGamePromptGeneration/localGamePromptGenerator.js"
+import {
+	buildAcceptedJapaneseAnswerTexts,
+	buildJapaneseAnswerFeedbackParts,
+	buildJapaneseAnswerFeedbackText,
+	normalizeJapaneseAnswerText,
+} from "./localGamePromptGeneration/localAnswerText.js"
+import {
+	cacheLocalGameChallengeResult,
+	findLocalGameChallenge,
+	getCachedLocalGameChallengeResult,
+	saveLocalGameChallenge,
+} from "./localGameChallenges.js"
+import { checkJapaneseGameAnswer, generateJapaneseGameFeedback } from "./sentences.js"
+
+const LOCAL_CHECK_FEEDBACK_BY_MODE = {
+	conjugations: (expectedAnswer) =>
+		`Correct sentence: ${expectedAnswer}. Check the conjugation on the target word.`,
+	"fix sentence": (expectedAnswer) =>
+		`Correct sentence: ${expectedAnswer}. Compare it with the provided sentence and look for the changed word or particle.`,
+	particles: (expectedAnswer) =>
+		`Correct sentence: ${expectedAnswer}. Check which particles attach to each word.`,
+	reorder: (expectedAnswer) =>
+		`Correct order: ${expectedAnswer}. Keep the same chunks, but move them into this order.`,
+}
 
 const gameCheckInstructions = {
 	translate: [
@@ -158,25 +181,155 @@ export function getGameCheckInstructions(mode) {
 	return checkInstructions
 }
 
-export async function generateGamePrompt({ mode, difficulty = "easy" }) {
-	const prompt = generateLocalGamePrompt({ mode, difficulty })
-	if (!prompt) throw gameModeError(mode)
+export async function generateGamePrompt({
+	mode,
+	difficulty = "easy",
+	randomNumber = Math.random,
+}) {
+	const localChallenge = generateLocalGameChallenge({ mode, difficulty, randomNumber })
+	if (!localChallenge) throw gameModeError(mode)
+
+	const challengeId = randomUUID()
+	const prompt = localChallenge.prompt
+	const expectedAnswers = buildAcceptedJapaneseAnswerTexts(
+		localChallenge.expectedJapaneseTranslation,
+	)
+	const expectedAnswerFeedbackText = buildJapaneseAnswerFeedbackText(
+		localChallenge.expectedJapaneseTranslation,
+	)
+	const expectedAnswerParts = buildJapaneseAnswerFeedbackParts(
+		localChallenge.expectedJapaneseTranslation,
+	)
+	const expectedAnswerKanaParts = buildJapaneseAnswerFeedbackParts(
+		localChallenge.expectedJapaneseTranslation,
+		"kana",
+	)
+	saveLocalGameChallenge({
+		challengeId,
+		mode,
+		difficulty,
+		prompt: prompt.prompt,
+		expectedAnswers,
+		expectedAnswerFeedbackText,
+		expectedAnswerParts,
+		expectedAnswerKanaParts,
+	})
 
 	return {
 		...prompt,
-		challengeId: randomUUID(),
+		challengeId,
 	}
 }
 
-export async function checkGameAnswer({ mode, prompt, answer }) {
+export async function checkGameAnswer(
+	{ mode, prompt, answer, challengeId, difficulty = "easy" },
+	{ checkAnswer = checkJapaneseGameAnswer } = {},
+) {
 	const checkInstructions = getGameCheckInstructions(mode)
+	const localResult = checkGeneratedGameAnswerLocally({
+		mode,
+		prompt,
+		answer,
+		challengeId,
+		difficulty,
+	})
+	if (localResult) return localResult
 
-	return checkJapaneseGameAnswer({
+	const { challenge, answerKey } = getGeneratedChallengeCheckData({
+		mode,
+		prompt,
+		answer,
+		challengeId,
+		difficulty,
+	})
+	const cachedResult = getCachedLocalGameChallengeResult(challenge, answerKey)
+	if (cachedResult) return cachedResult
+
+	const result = await checkAnswer({
 		gameTitle: mode,
 		prompt,
 		answer,
 		checkInstructions,
 	})
+	if (challenge) {
+		cacheLocalGameChallengeResult(challenge, answerKey, result)
+	}
+
+	return result
+}
+
+export function checkGeneratedGameAnswerLocally({
+	mode,
+	prompt,
+	answer,
+	challengeId,
+	difficulty = "easy",
+}) {
+	const { challenge, answerKey } = getGeneratedChallengeCheckData({
+		mode,
+		prompt,
+		answer,
+		challengeId,
+		difficulty,
+	})
+	if (!challenge?.expectedAnswers?.length) return null
+
+	const cachedResult = getCachedLocalGameChallengeResult(challenge, answerKey)
+	if (cachedResult) return cachedResult
+
+	const result = buildLocalGeneratedGameAnswerResult({ mode, answerKey, challenge })
+	if (result.correct) {
+		cacheLocalGameChallengeResult(challenge, answerKey, result)
+	}
+
+	return result
+}
+
+export async function generateLocalGameAnswerFeedback(
+	{ mode, prompt, answer, challengeId, difficulty = "easy" },
+	{ generateFeedback = generateJapaneseGameFeedback } = {},
+) {
+	const checkInstructions = getGameCheckInstructions(mode)
+	const { challenge, answerKey } = getGeneratedChallengeCheckData({
+		mode,
+		prompt,
+		answer,
+		challengeId,
+		difficulty,
+	})
+	if (!challenge?.expectedAnswers?.length) return null
+
+	const localResult = buildLocalGeneratedGameAnswerResult({ mode, answerKey, challenge })
+	if (localResult.correct) {
+		cacheLocalGameChallengeResult(challenge, answerKey, localResult)
+		return localResult
+	}
+
+	const fallbackFeedback = localGeneratedGameFeedback(mode, challenge)
+
+	try {
+		const feedback = await generateFeedback({
+			gameTitle: mode,
+			prompt,
+			answer,
+			expectedAnswer: challenge.expectedAnswerFeedbackText || challenge.expectedAnswers[0],
+			answerDiff: buildLocalAnswerDiff({ answer, challenge }),
+			checkInstructions,
+		})
+		const result = {
+			correct: false,
+			feedback: feedback || fallbackFeedback,
+		}
+		cacheLocalGameChallengeResult(challenge, answerKey, result)
+
+		return result
+	} catch (error) {
+		console.log(error)
+		return {
+			correct: false,
+			feedback: fallbackFeedback,
+		}
+	}
 }
 
 export async function checkSandboxSentence(
@@ -195,4 +348,142 @@ export async function checkSandboxSentence(
 			"If incorrect, explain the main grammar or word-choice issue and suggest a concise fix.",
 		].join(" "),
 	})
+}
+
+function buildLocalGeneratedGameAnswerResult({ mode, answerKey, challenge }) {
+	const normalizedExpectedAnswers = challenge.expectedAnswers.map(normalizeJapaneseAnswerText)
+	const correct = normalizedExpectedAnswers.includes(answerKey)
+
+	return {
+		correct,
+		feedback: correct ? "" : localGeneratedGameFeedback(mode, challenge),
+	}
+}
+
+function getGeneratedChallengeCheckData({ mode, prompt, answer, challengeId, difficulty }) {
+	return {
+		challenge: findLocalGameChallenge({ challengeId, mode, difficulty, prompt }),
+		answerKey: normalizeJapaneseAnswerText(answer),
+	}
+}
+
+function localGeneratedGameFeedback(mode, challenge) {
+	const expectedAnswer = challenge.expectedAnswerFeedbackText || challenge.expectedAnswers[0]
+	const feedbackBuilder = LOCAL_CHECK_FEEDBACK_BY_MODE[mode]
+
+	if (expectedAnswer && feedbackBuilder) return feedbackBuilder(expectedAnswer)
+	if (expectedAnswer) return `Correct sentence: ${expectedAnswer}. Try again.`
+
+	return "Try again."
+}
+
+function buildLocalAnswerDiff({ answer, challenge }) {
+	const answerKey = normalizeJapaneseAnswerText(answer)
+	const expectedPartSet = selectExpectedPartSetForAnswer(answerKey, challenge)
+	const expectedParts = expectedPartSet.parts
+	const expectedAnswer = (challenge.expectedAnswerParts || []).join(" ")
+
+	if (!expectedParts.length) {
+		return {
+			expectedAnswer,
+			submittedAnswer: answer,
+		}
+	}
+
+	const matchedParts = []
+	let answerCursor = 0
+
+	for (let index = 0; index < expectedParts.length; index += 1) {
+		const expectedPart = expectedParts[index]
+		const expectedPartKey = normalizeJapaneseAnswerText(expectedPart)
+
+		if (expectedPartKey && answerKey.startsWith(expectedPartKey, answerCursor)) {
+			matchedParts.push(expectedPart)
+			answerCursor += expectedPartKey.length
+			continue
+		}
+
+		return {
+			expectedAnswer,
+			submittedAnswer: answer,
+			matchedPrefix: matchedParts.join(" "),
+			expectedChunk: displayExpectedChunk(challenge, index, expectedPart),
+			submittedChunk: submittedChunkBeforeNextExpectedPart({
+				answerKey,
+				answerCursor,
+				remainingExpectedParts: expectedParts.slice(index + 1),
+			}),
+		}
+	}
+
+	const extraText = answerKey.slice(answerCursor)
+	if (extraText) {
+		return {
+			expectedAnswer,
+			submittedAnswer: answer,
+			matchedPrefix: matchedParts.join(" "),
+			expectedChunk: "",
+			submittedChunk: extraText,
+			extraText,
+		}
+	}
+
+	return {
+		expectedAnswer,
+		submittedAnswer: answer,
+		matchedPrefix: matchedParts.join(" "),
+	}
+}
+
+function selectExpectedPartSetForAnswer(answerKey, challenge) {
+	const expectedPartSets = [
+		{ parts: challenge.expectedAnswerParts || [] },
+		{ parts: challenge.expectedAnswerKanaParts || [] },
+	].filter((partSet) => partSet.parts.length > 0)
+
+	return expectedPartSets.reduce(
+		(bestPartSet, partSet) =>
+			countMatchingPrefixParts(answerKey, partSet.parts) >
+			countMatchingPrefixParts(answerKey, bestPartSet.parts)
+				? partSet
+				: bestPartSet,
+		expectedPartSets[0] || { parts: [] },
+	)
+}
+
+function countMatchingPrefixParts(answerKey, expectedParts) {
+	let answerCursor = 0
+	let matchingParts = 0
+
+	for (const expectedPart of expectedParts) {
+		const expectedPartKey = normalizeJapaneseAnswerText(expectedPart)
+		if (!expectedPartKey || !answerKey.startsWith(expectedPartKey, answerCursor)) break
+
+		answerCursor += expectedPartKey.length
+		matchingParts += 1
+	}
+
+	return matchingParts
+}
+
+function displayExpectedChunk(challenge, index, fallbackChunk) {
+	return challenge.expectedAnswerParts?.[index] || fallbackChunk
+}
+
+function submittedChunkBeforeNextExpectedPart({
+	answerKey,
+	answerCursor,
+	remainingExpectedParts,
+}) {
+	const remainingAnswer = answerKey.slice(answerCursor)
+	if (!remainingAnswer) return "(missing)"
+
+	const nextExpectedPartPosition = remainingExpectedParts
+		.map((part) => remainingAnswer.indexOf(normalizeJapaneseAnswerText(part)))
+		.filter((position) => position > -1)
+		.sort((left, right) => left - right)[0]
+
+	if (nextExpectedPartPosition === undefined) return remainingAnswer
+
+	return remainingAnswer.slice(0, nextExpectedPartPosition) || "(missing)"
 }

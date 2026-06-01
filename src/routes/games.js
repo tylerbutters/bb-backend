@@ -12,8 +12,15 @@ import {
 	assertCanUseChallengeCheck,
 	getUserGameQuota,
 	recordGameResult,
+	updateGameResultFeedback,
 } from "../services/gameStats.js"
-import { checkGameAnswer, checkSandboxSentence, generateGamePrompt } from "../services/games.js"
+import {
+	checkGameAnswer,
+	checkGeneratedGameAnswerLocally,
+	checkSandboxSentence,
+	generateGamePrompt,
+	generateLocalGameAnswerFeedback,
+} from "../services/games.js"
 import { getSessionByToken } from "../services/sessions.js"
 import { translateJapanese } from "../services/translate.js"
 
@@ -34,7 +41,9 @@ async function getOptionalCurrentUser(req, res) {
 	try {
 		const session = await getSessionByToken(token)
 		if (!session) {
-			clearSessionCookie(res)
+			if (res && !res.headersSent) {
+				clearSessionCookie(res)
+			}
 			return null
 		}
 
@@ -76,9 +85,31 @@ router.post(
 	"/check",
 	validateBody(gameCheckSchema),
 	asyncHandler(async (req, res) => {
-		const currentUser = await getOptionalCurrentUser(req, res)
 		const { answer, challengeId, difficulty, mode, prompt } = req.validated.body
+		const localResult = checkGeneratedGameAnswerLocally(req.validated.body)
 
+		if (localResult) {
+			res.status(200).send(
+				localResult.correct
+					? localResult
+					: {
+							...localResult,
+							feedback: "",
+							feedbackPending: true,
+						},
+			)
+			recordLocalCheckInBackground(req, {
+				challengeId,
+				mode,
+				difficulty,
+				prompt,
+				answer,
+				result: localResult,
+			})
+			return
+		}
+
+		const currentUser = await getOptionalCurrentUser(req, res)
 		if (!currentUser) {
 			throw createLoginRequiredForChallengeChecksError()
 		}
@@ -86,17 +117,14 @@ router.post(
 		await assertCanUseChallengeCheck(currentUser.id, challengeId)
 
 		const result = await checkGameAnswer(req.validated.body)
-		await recordGameResult({
-			userId: currentUser.id,
+		const quota = await recordResultAndGetQuota(currentUser.id, {
 			challengeId,
 			mode,
 			difficulty,
 			prompt,
 			answer,
-			correct: result.correct,
-			feedback: result.feedback,
+			result,
 		})
-		const quota = await getUserGameQuota(currentUser.id)
 
 		res.status(200).send({
 			...result,
@@ -104,6 +132,89 @@ router.post(
 		})
 	}),
 )
+
+router.post(
+	"/feedback",
+	validateBody(gameCheckSchema),
+	asyncHandler(async (req, res) => {
+		const { answer, challengeId, difficulty, mode, prompt } = req.validated.body
+		const currentUser = await getOptionalCurrentUser(req, res)
+		if (!currentUser) {
+			throw createLoginRequiredForChallengeChecksError()
+		}
+
+		await assertCanUseChallengeCheck(currentUser.id, challengeId)
+
+		const result = await generateLocalGameAnswerFeedback(req.validated.body)
+		if (!result) {
+			throw new HttpError(404, "Feedback is not available for this challenge.", {
+				code: "CHALLENGE_FEEDBACK_NOT_AVAILABLE",
+			})
+		}
+
+		const quota = await recordResultAndGetQuota(currentUser.id, {
+			challengeId,
+			mode,
+			difficulty,
+			prompt,
+			answer,
+			result,
+		})
+		await updateGameResultFeedback({
+			userId: currentUser.id,
+			challengeId,
+			feedback: result.feedback,
+		})
+
+		res.status(200).send({
+			...result,
+			quota,
+		})
+	}),
+)
+
+async function recordResultAndGetQuota(
+	userId,
+	{ challengeId, mode, difficulty, prompt, answer, result },
+) {
+	await recordGameResult({
+		userId,
+		challengeId,
+		mode,
+		difficulty,
+		prompt,
+		answer,
+		correct: result.correct,
+		feedback: result.feedback,
+	})
+
+	return getUserGameQuota(userId)
+}
+
+function recordLocalCheckInBackground(
+	req,
+	{ challengeId, mode, difficulty, prompt, answer, result },
+) {
+	setImmediate(async () => {
+		try {
+			const resolvedUserId = (await getOptionalCurrentUser(req))?.id
+			if (!resolvedUserId) return
+
+			await recordGameResult({
+				userId: resolvedUserId,
+				challengeId,
+				mode,
+				difficulty,
+				prompt,
+				answer,
+				correct: result.correct,
+				feedback: result.feedback,
+			})
+		} catch (error) {
+			console.log(error)
+		}
+	})
+}
 
 router.post(
 	"/sandbox/check-japanese",
