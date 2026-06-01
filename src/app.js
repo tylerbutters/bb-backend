@@ -6,6 +6,7 @@ import adminRouter from "./routes/admin.js"
 import authRouter from "./routes/auth.js"
 import gamesRouter from "./routes/games.js"
 import healthRouter from "./routes/health.js"
+import suggestionsRouter from "./routes/suggestions.js"
 import usersRouter from "./routes/users.js"
 import { apiRateLimiter } from "./middleware/rateLimiters.js"
 
@@ -90,6 +91,7 @@ app.use(`${apiRoot}/admin`, adminRouter)
 app.use(`${apiRoot}/users`, usersRouter)
 app.use(`${apiRoot}/login`, authRouter)
 app.use(`${apiRoot}/games`, gamesRouter)
+app.use(`${apiRoot}/suggestions`, suggestionsRouter)
 
 app.use(errorHandler)
 

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict"
 import { afterEach, beforeEach, describe, it } from "node:test"
 import { HttpError } from "../errors.js"
-import { sendPasswordResetCode, sendSignupConfirmationCode } from "./email.js"
+import {
+	sendPasswordResetCode,
+	sendSignupConfirmationCode,
+	sendSuggestionEmail,
+} from "./email.js"
 
 const envKeys = [
 	"NODE_ENV",
@@ -12,6 +16,7 @@ const envKeys = [
 	"ZOHO_FROM_ADDRESS",
 	"ZOHO_ACCOUNTS_URL",
 	"ZOHO_MAIL_API_URL",
+	"SUGGESTIONS_TO_ADDRESS",
 ]
 
 let originalEnv
@@ -147,6 +152,42 @@ describe("sendPasswordResetCode", () => {
 			subject: "Your Bunsho Builder confirmation code",
 			content:
 				"Use this code to confirm your email and finish creating your account:\n\n123456\n\nThis code expires in 10 minutes. If you did not request it, you can ignore this email.",
+			mailFormat: "plaintext",
+			askReceipt: "no",
+			encoding: "UTF-8",
+		})
+	})
+
+	it("sends an anonymous suggestion through the Mail API", async () => {
+		setZohoEnv()
+		process.env.SUGGESTIONS_TO_ADDRESS = "support@bunshobuilder.com"
+
+		const calls = []
+		globalThis.fetch = async (url, options) => {
+			calls.push({ url, options })
+
+			if (url === "https://accounts.zoho.com.au/oauth/v2/token") {
+				return new Response(JSON.stringify({ access_token: "access-token" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				})
+			}
+
+			return new Response(JSON.stringify({ status: { code: 200 } }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			})
+		}
+
+		await sendSuggestionEmail({ suggestion: "Please add custom practice lists." })
+
+		assert.equal(calls.length, 2)
+		const message = JSON.parse(calls[1].options.body)
+		assert.deepEqual(message, {
+			fromAddress: "no-reply@bunshobuilder.com",
+			toAddress: "support@bunshobuilder.com",
+			subject: "New Bunsho Builder suggestion",
+			content: "New Bunsho Builder suggestion:\n\nPlease add custom practice lists.",
 			mailFormat: "plaintext",
 			askReceipt: "no",
 			encoding: "UTF-8",

@@ -35,6 +35,10 @@ function getZohoTimeoutMs() {
 	return Number(envValue("ZOHO_TIMEOUT_MS") || defaultZohoTimeoutMs)
 }
 
+function getSuggestionRecipientAddress() {
+	return envValue("SUGGESTIONS_TO_ADDRESS") || envValue("ZOHO_FROM_ADDRESS")
+}
+
 function createZohoConfigError({ purpose, code }) {
 	return new HttpError(500, `${purpose} email is not configured.`, {
 		code,
@@ -274,5 +278,34 @@ export async function sendEmailChangeConfirmationEmail({ currentEmail, newEmail,
 		].join("\n"),
 		emailContext,
 		operation: "send the email change confirmation email",
+	})
+}
+
+export async function sendSuggestionEmail({ suggestion }) {
+	const emailContext = {
+		purpose: "Suggestion",
+		code: "SUGGESTION_EMAIL_SEND_FAILED",
+	}
+
+	if (!hasZohoConfig()) {
+		if (process.env.NODE_ENV === "production") {
+			throw createZohoConfigError({
+				purpose: "Suggestion",
+				code: "SUGGESTION_EMAIL_NOT_CONFIGURED",
+			})
+		}
+
+		console.info(
+			`Suggestion received: ${suggestion}. Zoho email is not configured; missing env vars: ${getMissingZohoConfigKeys().join(", ")}`,
+		)
+		return
+	}
+
+	await sendZohoMail({
+		toAddress: getSuggestionRecipientAddress(),
+		subject: "New Bunsho Builder suggestion",
+		content: ["New Bunsho Builder suggestion:", "", suggestion].join("\n"),
+		emailContext,
+		operation: "send the suggestion email",
 	})
 }

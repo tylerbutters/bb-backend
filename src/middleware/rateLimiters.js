@@ -38,3 +38,10 @@ export const signupRateLimiter = createLimiter({
 	message: "Too many signup attempts. Please try again later.",
 	code: "SIGNUP_RATE_LIMITED",
 })
+
+export const suggestionRateLimiter = createLimiter({
+	windowMs: 60 * 60 * 1000,
+	limit: Number(process.env.SUGGESTION_RATE_LIMIT_MAX || 10),
+	message: "Too many suggestions. Please try again later.",
+	code: "SUGGESTION_RATE_LIMITED",
+})

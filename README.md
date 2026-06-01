@@ -49,12 +49,14 @@ The API uses:
 
 - `CLIENT_URL` should be set to the production frontend URL.
 - `NODE_ENV=production` enables production cookie behavior.
+- `SUGGESTIONS_TO_ADDRESS` can be set to the inbox that receives anonymous suggestions. When it is not set, suggestions are sent to `ZOHO_FROM_ADDRESS`.
 - `TRUST_PROXY` should be set when running behind a trusted proxy or platform load balancer.
 - Rate limits can be adjusted with:
   - `API_RATE_LIMIT_MAX`
   - `AUTH_RATE_LIMIT_MAX`
   - `ACCOUNT_RECOVERY_RATE_LIMIT_MAX`
   - `SIGNUP_RATE_LIMIT_MAX`
+  - `SUGGESTION_RATE_LIMIT_MAX`
 
 ### Current Limits
 
