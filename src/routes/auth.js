@@ -11,7 +11,7 @@ import {
 import { verifyPassword } from "../services/password.js"
 import { confirmPasswordReset, requestPasswordReset } from "../services/passwordReset.js"
 import { createUserSession } from "../services/sessions.js"
-import { getUserByEmailWithPassword } from "../services/users.js"
+import { applyAdminEmailBootstrap, getUserByEmailWithPassword } from "../services/users.js"
 
 const router = Router()
 
@@ -62,12 +62,13 @@ router.post(
 			throw createInvalidCredentialsError()
 		}
 
-		const session = await createUserSession(user.id)
+		const currentUser = await applyAdminEmailBootstrap(user)
+		const session = await createUserSession(currentUser.id)
 		setSessionCookie(res, session.token)
 
 		res.status(200).send({
 			message: "Login successful.",
-			user,
+			user: currentUser,
 		})
 	}),
 )

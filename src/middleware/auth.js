@@ -5,6 +5,7 @@ import {
 	getSessionByToken,
 	revokeSessionToken,
 } from "../services/sessions.js"
+import { applyAdminEmailBootstrap } from "../services/users.js"
 
 const SESSION_MAX_AGE_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000
 
@@ -74,6 +75,12 @@ function createForbiddenUserError() {
 	})
 }
 
+function createAdminForbiddenError() {
+	return new HttpError(403, "Admin access is required.", {
+		code: "ADMIN_ACCESS_FORBIDDEN",
+	})
+}
+
 export const requireAuth = asyncHandler(async (req, res, next) => {
 	const token = getSessionToken(req)
 	const session = await getSessionByToken(token)
@@ -83,10 +90,24 @@ export const requireAuth = asyncHandler(async (req, res, next) => {
 		throw createUnauthenticatedError()
 	}
 
-	req.currentUser = session.user
+	req.currentUser = await applyAdminEmailBootstrap(session.user)
 	req.sessionToken = token
 	next()
 })
+
+export function requireAdmin(req, res, next) {
+	if (!req.currentUser) {
+		next(createUnauthenticatedError())
+		return
+	}
+
+	if (req.currentUser.role !== "admin") {
+		next(createAdminForbiddenError())
+		return
+	}
+
+	next()
+}
 
 export function requireCurrentUserParam(req, res, next) {
 	const requestedUserId = req.validated?.params?.user_id ?? req.params.user_id

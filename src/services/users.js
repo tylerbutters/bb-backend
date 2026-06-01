@@ -5,12 +5,27 @@ import { hashPassword, verifyPassword } from "./password.js"
 import { sendEmailChangeConfirmationEmail } from "./email.js"
 
 const publicUserFields = `
-	id, email, display_name AS "displayName", plan, created_at AS "createdAt", updated_at AS "updatedAt"
+	id, email, display_name AS "displayName", plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
 `
 const EMAIL_CHANGE_TOKEN_EXPIRES_MINUTES = 30
 
 function normalizeEmail(email) {
 	return email.trim().toLowerCase()
+}
+
+function adminEmailSet() {
+	return new Set(
+		(process.env.ADMIN_EMAILS || "")
+			.split(",")
+			.map((email) => email.trim().toLowerCase())
+			.filter(Boolean),
+	)
+}
+
+export function isAdminBootstrapEmail(email) {
+	if (!email) return false
+
+	return adminEmailSet().has(normalizeEmail(email))
 }
 
 function createEmailInUseError() {
@@ -57,6 +72,30 @@ export async function createUser({ email, displayName, password }) {
 	)
 
 	return result.rows[0]
+}
+
+export async function applyAdminEmailBootstrap(
+	user,
+	{ query = db.query.bind(db) } = {},
+) {
+	if (!user || !isAdminBootstrapEmail(user.email) || user.role === "admin") {
+		return user
+	}
+
+	const result = await query(
+		`
+		UPDATE users
+		SET role = 'admin'
+		WHERE id = $1
+		RETURNING ${publicUserFields}
+		`,
+		[user.id],
+	)
+
+	return result.rows[0] || {
+		...user,
+		role: "admin",
+	}
 }
 
 export async function getUserIdByEmail(email, { query = db.query.bind(db) } = {}) {

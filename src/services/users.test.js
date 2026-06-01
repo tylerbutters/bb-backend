@@ -1,7 +1,18 @@
 import assert from "node:assert/strict"
-import { describe, it } from "node:test"
+import { afterEach, describe, it } from "node:test"
 import { HttpError } from "../errors.js"
-import { updateUser } from "./users.js"
+import { applyAdminEmailBootstrap, isAdminBootstrapEmail, updateUser } from "./users.js"
+
+const originalAdminEmails = process.env.ADMIN_EMAILS
+
+afterEach(() => {
+	if (originalAdminEmails === undefined) {
+		delete process.env.ADMIN_EMAILS
+		return
+	}
+
+	process.env.ADMIN_EMAILS = originalAdminEmails
+})
 
 function createUpdateUserQueryStub({
 	currentUser = { passwordHash: "hash:old-password1" },
@@ -32,6 +43,70 @@ function createUpdateUserQueryStub({
 }
 
 describe("users service", () => {
+	it("recognizes admin bootstrap emails case-insensitively", () => {
+		process.env.ADMIN_EMAILS = "owner@example.com, Admin@Example.com "
+
+		assert.equal(isAdminBootstrapEmail("admin@example.com"), true)
+		assert.equal(isAdminBootstrapEmail("OWNER@example.com"), true)
+		assert.equal(isAdminBootstrapEmail("user@example.com"), false)
+	})
+
+	it("promotes allowlisted users to admin", async () => {
+		process.env.ADMIN_EMAILS = "admin@example.com"
+		const calls = []
+		const promotedUser = {
+			id: 7,
+			email: "admin@example.com",
+			displayName: "Admin",
+			plan: "free",
+			role: "admin",
+			createdAt: "2026-01-01T00:00:00.000Z",
+			updatedAt: "2026-01-01T00:00:00.000Z",
+		}
+
+		const user = await applyAdminEmailBootstrap(
+			{
+				...promotedUser,
+				role: "user",
+			},
+			{
+				query: async (sql, params) => {
+					calls.push({ sql, params })
+					return {
+						rowCount: 1,
+						rows: [promotedUser],
+					}
+				},
+			},
+		)
+
+		assert.deepEqual(user, promotedUser)
+		assert.equal(calls.length, 1)
+		assert.match(calls[0].sql, /SET role = 'admin'/)
+		assert.deepEqual(calls[0].params, [7])
+	})
+
+	it("does not auto-demote admins when ADMIN_EMAILS changes", async () => {
+		process.env.ADMIN_EMAILS = "owner@example.com"
+		const adminUser = {
+			id: 7,
+			email: "admin@example.com",
+			displayName: "Admin",
+			role: "admin",
+		}
+		const calls = []
+
+		const user = await applyAdminEmailBootstrap(adminUser, {
+			query: async (sql, params) => {
+				calls.push({ sql, params })
+				return { rowCount: 0, rows: [] }
+			},
+		})
+
+		assert.equal(user, adminUser)
+		assert.equal(calls.length, 0)
+	})
+
 	it("updates a password only after verifying the current password", async () => {
 		const { calls, query } = createUpdateUserQueryStub()
 

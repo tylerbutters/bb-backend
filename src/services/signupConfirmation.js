@@ -32,7 +32,7 @@ function isExpired(expiresAt, now) {
 }
 
 const publicUserFields = `
-	id, email, display_name AS "displayName", plan, created_at AS "createdAt", updated_at AS "updatedAt"
+	id, email, display_name AS "displayName", plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
 `
 
 export function createSignupConfirmationService({

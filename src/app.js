@@ -2,6 +2,7 @@ import express from "express"
 import cors from "cors"
 import helmet from "helmet"
 import { HttpError, errorHandler } from "./errors.js"
+import adminRouter from "./routes/admin.js"
 import authRouter from "./routes/auth.js"
 import gamesRouter from "./routes/games.js"
 import healthRouter from "./routes/health.js"
@@ -85,6 +86,7 @@ app.use(express.json({ limit: "16kb" }))
 
 app.use(`${apiRoot}/health`, healthRouter)
 app.use(apiRoot, apiRateLimiter)
+app.use(`${apiRoot}/admin`, adminRouter)
 app.use(`${apiRoot}/users`, usersRouter)
 app.use(`${apiRoot}/login`, authRouter)
 app.use(`${apiRoot}/games`, gamesRouter)

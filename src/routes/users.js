@@ -19,6 +19,7 @@ import {
 } from "../schemas/users.js"
 import { confirmSignup, requestSignupConfirmation } from "../services/signupConfirmation.js"
 import {
+	applyAdminEmailBootstrap,
 	confirmEmailChange,
 	deleteUser,
 	requestEmailChange,
@@ -68,11 +69,15 @@ router.post(
 	validateBody(confirmSignupSchema),
 	asyncHandler(async (req, res) => {
 		const result = await confirmSignup(req.validated.body)
-		const session = await createUserSession(result.user.id)
+		const user = await applyAdminEmailBootstrap(result.user)
+		const session = await createUserSession(user.id)
 
 		setSessionCookie(res, session.token)
 
-		res.status(201).send(result)
+		res.status(201).send({
+			...result,
+			user,
+		})
 	}),
 )
 
