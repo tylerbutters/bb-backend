@@ -1,10 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { HttpError } from "../errors.js"
 import { GAME_MODES } from "../gameModes.js"
-import {
-	CONJUGATION_TARGETS_BY_DIFFICULTY,
-	generateLocalGamePrompt,
-} from "./localPromptGenerator.js"
+import { generateLocalGamePrompt } from "./localGamePromptGeneration/localGamePromptGenerator.js"
 import { checkJapaneseGameAnswer } from "./sentences.js"
 
 const gameCheckInstructions = {
@@ -23,11 +20,11 @@ const gameCheckInstructions = {
 	].join(" "),
 	"fix sentence": [
 		"The prompt is an English target meaning.",
-		"The learner was given Japanese sentence elements in normal order with one wrong particle or word.",
+		"The learner was given Japanese sentence elements in normal order with one or more wrong particles or words.",
 		"The answer is the learner's corrected Japanese sentence.",
-		"This exercise is focused only on fixing the one wrong particle or word.",
-		"Mark correct when the answer fixes that focused mistake and still communicates the target meaning.",
-		"Do not mark incorrect or give feedback about unrelated grammar, style, word order, or optional phrasing unless they prevent identifying the focused fix.",
+		"This exercise is focused only on fixing the wrong particles or words.",
+		"Mark correct when the answer fixes those focused mistakes and still communicates the target meaning.",
+		"Do not mark incorrect or give feedback about unrelated grammar, style, word order, or optional phrasing unless they prevent identifying the focused fixes.",
 	].join(" "),
 	particles: [
 		"The prompt is an English target meaning for a Japanese sentence with missing particles.",
@@ -113,29 +110,14 @@ function hasConjugationHelperWord(words) {
 	})
 }
 
-function getConjugationTargets(difficulty = "hard") {
-	const difficultyOrder = ["easy", "medium", "hard"]
-	const difficultyIndex = difficultyOrder.indexOf(difficulty)
-	const maxIndex = difficultyIndex === -1 ? difficultyOrder.length - 1 : difficultyIndex
-
-	return difficultyOrder
-		.slice(0, maxIndex + 1)
-		.flatMap((difficultyKey) => CONJUGATION_TARGETS_BY_DIFFICULTY[difficultyKey])
-}
-
-export function validateConjugationPrompt(data, { difficulty = "hard" } = {}) {
+export function validateConjugationPrompt(data) {
 	const prompt = String(data?.prompt || "").trim()
-	const englishSentence = String(data?.englishSentence || "").trim()
-	const targetConjugation = String(data?.targetConjugation || "").trim()
 	const japaneseTranslation = normalizeJapaneseTranslationWords(data?.japaneseTranslation)
-	const allowedTargets = getConjugationTargets(difficulty)
 
 	if (
 		!prompt ||
-		!englishSentence ||
-		prompt !== englishSentence ||
-		!allowedTargets.includes(targetConjugation) ||
 		japaneseTranslation.length === 0 ||
+		hasConjugationMetadata(data?.japaneseTranslation) ||
 		hasStandaloneAttachedParticle(japaneseTranslation) ||
 		hasConjugationHelperWord(japaneseTranslation)
 	) {
@@ -147,10 +129,16 @@ export function validateConjugationPrompt(data, { difficulty = "hard" } = {}) {
 
 	return {
 		prompt,
-		englishSentence,
-		targetConjugation,
 		japaneseTranslation,
 	}
+}
+
+function hasConjugationMetadata(words) {
+	if (!Array.isArray(words)) return false
+
+	return words.some(
+		(word) => word && typeof word === "object" && Object.hasOwn(word, "conjugation"),
+	)
 }
 
 function gameModeError(mode) {

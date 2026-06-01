@@ -1,4 +1,4 @@
-export const LOCAL_VOCABULARY = {
+export const LOCAL_PROMPT_VOCABULARY = {
 	i: {
 		kanji: "私",
 		kana: "わたし",
@@ -51,6 +51,42 @@ export const LOCAL_VOCABULARY = {
 		difficulty: "medium",
 		roles: ["subject", "patient", "agent", "companion"],
 		english: { subject: "my friend", object: "my friend" },
+		thirdPersonSingular: true,
+	},
+	mother: {
+		kanji: "母",
+		kana: "はは",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["subject"],
+		english: { subject: "my mother", object: "my mother" },
+		thirdPersonSingular: true,
+	},
+	father: {
+		kanji: "父",
+		kana: "ちち",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["subject"],
+		english: { subject: "my father", object: "my father" },
+		thirdPersonSingular: true,
+	},
+	child: {
+		kanji: "子供",
+		kana: "こども",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["subject"],
+		english: { subject: "the child", object: "the child" },
+		thirdPersonSingular: true,
+	},
+	doctor: {
+		kanji: "医者",
+		kana: "いしゃ",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["subject"],
+		english: { subject: "the doctor", object: "the doctor" },
 		thirdPersonSingular: true,
 	},
 	school: {
@@ -124,6 +160,50 @@ export const LOCAL_VOCABULARY = {
 		difficulty: "medium",
 		roles: ["place", "destination"],
 		english: { place: "at the hospital", destination: "to the hospital" },
+	},
+	restaurant: {
+		kanji: "レストラン",
+		kana: "レストラン",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["place", "destination"],
+		english: {
+			subject: "the restaurant",
+			place: "at the restaurant",
+			destination: "to the restaurant",
+		},
+	},
+	classroom: {
+		kanji: "教室",
+		kana: "きょうしつ",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["place", "destination"],
+		english: {
+			subject: "the classroom",
+			place: "in the classroom",
+			destination: "to the classroom",
+		},
+	},
+	office: {
+		kanji: "事務所",
+		kana: "じむしょ",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["place", "destination"],
+		english: { subject: "the office", place: "at the office", destination: "to the office" },
+	},
+	supermarket: {
+		kanji: "スーパー",
+		kana: "スーパー",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["place", "destination"],
+		english: {
+			subject: "the supermarket",
+			place: "at the supermarket",
+			destination: "to the supermarket",
+		},
 	},
 	movieTheater: {
 		kanji: "映画館",
@@ -214,6 +294,38 @@ export const LOCAL_VOCABULARY = {
 		roles: ["object"],
 		english: { object: "tea" },
 	},
+	coffee: {
+		kanji: "コーヒー",
+		kana: "コーヒー",
+		type: "noun",
+		difficulty: "easy",
+		roles: ["object"],
+		english: { object: "coffee" },
+	},
+	lunch: {
+		kanji: "昼ご飯",
+		kana: "ひるごはん",
+		type: "noun",
+		difficulty: "easy",
+		roles: ["object"],
+		english: { object: "lunch" },
+	},
+	homework: {
+		kanji: "宿題",
+		kana: "しゅくだい",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["object"],
+		english: { subject: "the homework", object: "homework", plural: "homework" },
+	},
+	phone: {
+		kanji: "電話",
+		kana: "でんわ",
+		type: "noun",
+		difficulty: "medium",
+		roles: ["object"],
+		english: { subject: "the phone", object: "a phone", plural: "phones" },
+	},
 	music: {
 		kanji: "音楽",
 		kana: "おんがく",
@@ -270,6 +382,46 @@ export const LOCAL_VOCABULARY = {
 		roles: ["adjective"],
 		english: { predicate: "simple" },
 	},
+	difficult: {
+		kanji: "難しい",
+		kana: "むずかしい",
+		type: "adjective",
+		difficulty: "medium",
+		roles: ["adjective"],
+		english: { predicate: "difficult" },
+	},
+	fun: {
+		kanji: "楽しい",
+		kana: "たのしい",
+		type: "adjective",
+		difficulty: "medium",
+		roles: ["adjective"],
+		english: { predicate: "fun" },
+	},
+	important: {
+		kanji: "大切",
+		kana: "たいせつ",
+		type: "adjective",
+		difficulty: "medium",
+		roles: ["adjective"],
+		english: { predicate: "important" },
+	},
+	expensive: {
+		kanji: "高い",
+		kana: "たかい",
+		type: "adjective",
+		difficulty: "medium",
+		roles: ["adjective"],
+		english: { predicate: "expensive" },
+	},
+	cheap: {
+		kanji: "安い",
+		kana: "やすい",
+		type: "adjective",
+		difficulty: "medium",
+		roles: ["adjective"],
+		english: { predicate: "cheap" },
+	},
 	quickly: {
 		kanji: "早く",
 		kana: "はやく",
@@ -287,7 +439,7 @@ export const LOCAL_VOCABULARY = {
 		english: { adverb: "slowly" },
 	},
 	well: {
-		kanji: "良く",
+		kanji: "よく",
 		kana: "よく",
 		type: "adverb",
 		difficulty: "medium",
@@ -301,6 +453,46 @@ export const LOCAL_VOCABULARY = {
 		difficulty: "medium",
 		roles: ["adverb"],
 		english: { adverb: "sometimes" },
+	},
+	today: {
+		kanji: "今日",
+		kana: "きょう",
+		type: "adverb",
+		difficulty: "medium",
+		roles: ["adverb"],
+		english: { adverb: "today" },
+	},
+	yesterday: {
+		kanji: "昨日",
+		kana: "きのう",
+		type: "adverb",
+		difficulty: "medium",
+		roles: ["adverb"],
+		english: { adverb: "yesterday" },
+	},
+	tomorrow: {
+		kanji: "明日",
+		kana: "あした",
+		type: "adverb",
+		difficulty: "medium",
+		roles: ["adverb"],
+		english: { adverb: "tomorrow" },
+	},
+	often: {
+		kanji: "よく",
+		kana: "よく",
+		type: "adverb",
+		difficulty: "medium",
+		roles: ["adverb"],
+		english: { adverb: "often" },
+	},
+	usually: {
+		kanji: "普通",
+		kana: "ふつう",
+		type: "adverb",
+		difficulty: "medium",
+		roles: ["adverb"],
+		english: { adverb: "usually" },
 	},
 	bookCounter: {
 		kanji: "冊",
@@ -327,7 +519,7 @@ export const LOCAL_VOCABULARY = {
 		english: { counter: "flat things" },
 	},
 	go: {
-		kanji: "行く",
+		kanji: "いく",
 		kana: "いく",
 		type: "verb",
 		difficulty: "easy",
@@ -383,7 +575,7 @@ export const LOCAL_VOCABULARY = {
 		english: { base: "study", present3: "studies", past: "studied" },
 	},
 	watch: {
-		kanji: "見る",
+		kanji: "みる",
 		kana: "みる",
 		type: "verb",
 		difficulty: "medium",
@@ -405,6 +597,14 @@ export const LOCAL_VOCABULARY = {
 		difficulty: "medium",
 		roles: ["verb"],
 		english: { base: "speak", present3: "speaks", past: "spoke" },
+	},
+	listen: {
+		kanji: "聞く",
+		kana: "きく",
+		type: "verb",
+		difficulty: "medium",
+		roles: ["verb"],
+		english: { base: "listen to", present3: "listens to", past: "listened to" },
 	},
 	wait: {
 		kanji: "待つ",
@@ -448,9 +648,9 @@ export const LOCAL_VOCABULARY = {
 	},
 }
 
-export function getLocalVocabularyWord(key) {
-	const word = LOCAL_VOCABULARY[key]
-	if (!word) throw new Error(`Unknown local prompt word: ${key}`)
+export function getPromptVocabularyEntry(key) {
+	const vocabularyEntry = LOCAL_PROMPT_VOCABULARY[key]
+	if (!vocabularyEntry) throw new Error(`Unknown local prompt vocabulary key: ${key}`)
 
-	return word
+	return vocabularyEntry
 }

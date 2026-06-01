@@ -1,13 +1,10 @@
 import assert from "node:assert/strict"
 import fs from "node:fs"
 import { describe, it } from "node:test"
-import { validateConjugationPrompt } from "./games.js"
-import { LOCAL_VOCABULARY } from "./localPromptCases/vocabulary.js"
-import {
-	CONJUGATION_TARGETS_BY_DIFFICULTY,
-	generateLocalGamePrompt,
-} from "./localPromptGenerator.js"
-import { generateLocalSentence } from "./localSentenceGenerator.js"
+import { validateConjugationPrompt } from "../games.js"
+import { LOCAL_PROMPT_VOCABULARY } from "./promptData/localVocabulary.js"
+import { generateLocalGamePrompt } from "./localGamePromptGenerator.js"
+import { generateSentenceFromFrame } from "./sentenceFrames/index.js"
 
 const FIRST_RANDOM_VALUE = 0
 const LAST_RANDOM_VALUE = 0.999999
@@ -17,7 +14,7 @@ describe("generateLocalGamePrompt", () => {
 		const prompt = generateLocalGamePrompt({
 			mode: "translate",
 			difficulty: "easy",
-			random: () => FIRST_RANDOM_VALUE,
+			randomNumber: () => FIRST_RANDOM_VALUE,
 		})
 
 		assert.equal(prompt.prompt, "I eat sushi.")
@@ -27,17 +24,17 @@ describe("generateLocalGamePrompt", () => {
 	})
 
 	it("generates local prompts for each structured game mode", () => {
-		for (const mode of ["fix sentence", "particles", "reorder"]) {
+		for (const mode of ["conjugations", "fix sentence", "particles", "reorder"]) {
 			const prompt = generateLocalGamePrompt({
 				mode,
 				difficulty: "medium",
-				random: () => FIRST_RANDOM_VALUE,
+				randomNumber: () => FIRST_RANDOM_VALUE,
 			})
 
 			assert.equal(prompt.source, "local")
 			assert.equal(typeof prompt.prompt, "string")
 			assert.notEqual(prompt.prompt.length, 0)
-			assert.equal(prompt.profile.vocabLevel, "easy")
+			assert.equal(prompt.gameProfile.vocabLevel, "easy")
 		}
 	})
 
@@ -47,7 +44,7 @@ describe("generateLocalGamePrompt", () => {
 				const prompt = generateLocalGamePrompt({
 					mode: "particles",
 					difficulty,
-					random: () => randomValue,
+					randomNumber: () => randomValue,
 				})
 
 				assert.equal(Array.isArray(prompt.japaneseTranslation), true)
@@ -63,13 +60,13 @@ describe("generateLocalGamePrompt", () => {
 			generateLocalGamePrompt({
 				mode: "particles",
 				difficulty: "easy",
-				random: () => FIRST_RANDOM_VALUE,
+				randomNumber: () => FIRST_RANDOM_VALUE,
 			}),
 			{
 				prompt: "I eat sushi.",
 				source: "local",
 				templateId: "subject_object_verb",
-				profile: {
+				gameProfile: {
 					vocabLevel: "easy",
 					sentenceComplexity: "simple",
 					particleLevel: "easy",
@@ -87,7 +84,7 @@ describe("generateLocalGamePrompt", () => {
 		const prompt = generateLocalGamePrompt({
 			mode: "reorder",
 			difficulty: "easy",
-			random: () => FIRST_RANDOM_VALUE,
+			randomNumber: () => FIRST_RANDOM_VALUE,
 		})
 
 		assert.equal(prompt.prompt, "I eat sushi.")
@@ -104,7 +101,7 @@ describe("generateLocalGamePrompt", () => {
 				const nextPrompt = generateLocalGamePrompt({
 					mode: "reorder",
 					difficulty,
-					random: () => randomValue,
+					randomNumber: () => randomValue,
 				})
 
 				assert.equal(Array.isArray(nextPrompt.japaneseTranslation), true)
@@ -120,7 +117,7 @@ describe("generateLocalGamePrompt", () => {
 			generateLocalGamePrompt({
 				mode: "reorder",
 				difficulty: "medium",
-				random: () => FIRST_RANDOM_VALUE,
+				randomNumber: () => FIRST_RANDOM_VALUE,
 			}).japaneseTranslation,
 			[
 				{ kanji: "学校", kana: "がっこう", particle: "で" },
@@ -138,7 +135,7 @@ describe("generateLocalGamePrompt", () => {
 			generateLocalGamePrompt({
 				mode: "particles",
 				difficulty: "medium",
-				random: () => LAST_RANDOM_VALUE,
+				randomNumber: () => LAST_RANDOM_VALUE,
 			}).japaneseTranslation[2].conjugation,
 			["passive", "past"],
 		)
@@ -147,24 +144,24 @@ describe("generateLocalGamePrompt", () => {
 			generateLocalGamePrompt({
 				mode: "particles",
 				difficulty: "hard",
-				random: () => LAST_RANDOM_VALUE,
+				randomNumber: () => LAST_RANDOM_VALUE,
 			}).japaneseTranslation[3].conjugation,
 			["causative", "passive", "past"],
 		)
 	})
 
 	it("generates adjective, adverb, and counter elements", () => {
-		const adjectiveSentence = generateLocalSentence({
+		const adjectiveSentence = generateSentenceFromFrame({
 			difficulty: "easy",
-			random: () => LAST_RANDOM_VALUE,
+			randomNumber: () => LAST_RANDOM_VALUE,
 		})
-		const adverbSentence = generateLocalSentence({
+		const adverbSentence = generateSentenceFromFrame({
 			difficulty: "medium",
-			random: () => 0.6,
+			randomNumber: () => 0.6,
 		})
-		const counterSentence = generateLocalSentence({
+		const counterSentence = generateSentenceFromFrame({
 			difficulty: "hard",
-			random: () => 0.6,
+			randomNumber: () => 0.6,
 		})
 
 		assert.equal(adjectiveSentence.templateId, "adjective_predicate")
@@ -180,13 +177,13 @@ describe("generateLocalGamePrompt", () => {
 	})
 
 	it("samples rule generation across modes and difficulties", () => {
-		for (const mode of ["translate", "particles", "reorder", "fix sentence"]) {
+		for (const mode of ["translate", "conjugations", "particles", "reorder", "fix sentence"]) {
 			for (const difficulty of ["easy", "medium", "hard"]) {
 				for (const randomValue of [0, 0.2, 0.4, 0.6, 0.8, LAST_RANDOM_VALUE]) {
 					const prompt = generateLocalGamePrompt({
 						mode,
 						difficulty,
-						random: () => randomValue,
+						randomNumber: () => randomValue,
 					})
 
 					assert.equal(prompt.source, "local")
@@ -215,36 +212,53 @@ describe("generateLocalGamePrompt", () => {
 
 	it("scrambles reorder prompts without losing generated elements", () => {
 		for (const difficulty of ["easy", "medium", "hard"]) {
-			const random = () => 0
+			const randomNumber = () => 0
 			const sentence = stripPromptMetadata(
-				generateLocalSentence({ difficulty, random }).japaneseTranslation,
+				generateSentenceFromFrame({ difficulty, randomNumber }).japaneseTranslation,
 			)
-			const prompt = generateLocalGamePrompt({ mode: "reorder", difficulty, random })
+			const prompt = generateLocalGamePrompt({
+				mode: "reorder",
+				difficulty,
+				randomNumber,
+			})
 
 			assert.notDeepEqual(prompt.japaneseTranslation, sentence)
 			assert.deepEqual(sortWords(prompt.japaneseTranslation), sortWords(sentence))
 		}
 	})
 
-	it("introduces exactly one fix sentence mistake", () => {
+	it("increases fix sentence mistakes by difficulty", () => {
+		const expectedMistakesByDifficulty = {
+			easy: 1,
+			medium: 2,
+			hard: 3,
+		}
+
 		for (const difficulty of ["easy", "medium", "hard"]) {
 			for (const randomValue of [FIRST_RANDOM_VALUE, LAST_RANDOM_VALUE]) {
-				const random = () => randomValue
+				const randomNumber = () => randomValue
 				const sentence = stripPromptMetadata(
-					generateLocalSentence({ difficulty, random }).japaneseTranslation,
+					generateSentenceFromFrame({ difficulty, randomNumber }).japaneseTranslation,
 				)
-				const prompt = generateLocalGamePrompt({ mode: "fix sentence", difficulty, random })
+				const prompt = generateLocalGamePrompt({
+					mode: "fix sentence",
+					difficulty,
+					randomNumber,
+				})
 
-				assert.equal(countChangedWords(sentence, prompt.japaneseTranslation), 1)
+				assert.equal(
+					countChangedWords(sentence, prompt.japaneseTranslation),
+					expectedMistakesByDifficulty[difficulty],
+				)
 			}
 		}
 	})
 
-	it("generates fix sentence prompts with English text and one wrong element", () => {
+	it("generates fix sentence prompts with English text and wrong elements", () => {
 		const prompt = generateLocalGamePrompt({
 			mode: "fix sentence",
 			difficulty: "easy",
-			random: () => FIRST_RANDOM_VALUE,
+			randomNumber: () => FIRST_RANDOM_VALUE,
 		})
 
 		assert.equal(prompt.prompt, "I eat sushi.")
@@ -261,7 +275,7 @@ describe("generateLocalGamePrompt", () => {
 				const nextPrompt = generateLocalGamePrompt({
 					mode: "fix sentence",
 					difficulty,
-					random: () => randomValue,
+					randomNumber: () => randomValue,
 				})
 
 				assert.equal(Array.isArray(nextPrompt.japaneseTranslation), true)
@@ -272,63 +286,95 @@ describe("generateLocalGamePrompt", () => {
 		}
 	})
 
-	it("keeps conjugation hard prompts focused on hard conjugation with easy vocab", () => {
+	it("generates conjugation prompts by stripping conjugations from sentence frames", () => {
 		const prompt = generateLocalGamePrompt({
 			mode: "conjugations",
-			difficulty: "hard",
-			random: () => FIRST_RANDOM_VALUE,
+			difficulty: "easy",
+			randomNumber: () => FIRST_RANDOM_VALUE,
 		})
 
-		assert.equal(prompt.prompt, "She was not able to read the book.")
-		assert.equal(prompt.targetConjugation, "potential negative past")
-		assert.equal(prompt.profile.vocabLevel, "easy")
-		assert.equal(prompt.profile.conjugationLevel, "hard")
-		assert.deepEqual(validateConjugationPrompt(prompt, { difficulty: "hard" }), {
-			prompt: "She was not able to read the book.",
-			englishSentence: "She was not able to read the book.",
-			targetConjugation: "potential negative past",
+		assert.deepEqual(prompt, {
+			prompt: "I ate sushi.",
+			source: "local",
+			templateId: "subject_object_verb",
+			gameProfile: {
+				vocabLevel: "easy",
+				sentenceComplexity: "simple",
+				conjugationLevel: "easy",
+			},
 			japaneseTranslation: [
-				{ kanji: "彼女", kana: "かのじょ", particle: "は" },
-				{ kanji: "本", kana: "ほん", particle: "を" },
-				{ kanji: "読む", kana: "よむ" },
+				{ kanji: "私", kana: "わたし", particle: "は" },
+				{ kanji: "寿司", kana: "すし", particle: "を" },
+				{ kanji: "食べる", kana: "たべる" },
+			],
+		})
+		assert.deepEqual(validateConjugationPrompt(prompt), {
+			prompt: "I ate sushi.",
+			japaneseTranslation: [
+				{ kanji: "私", kana: "わたし", particle: "は" },
+				{ kanji: "寿司", kana: "すし", particle: "を" },
+				{ kanji: "食べる", kana: "たべる" },
 			],
 		})
 	})
 
-	it("can generate the most complex hard conjugation target without helper words", () => {
+	it("uses harder sentence frames for harder conjugation prompts", () => {
 		const prompt = generateLocalGamePrompt({
 			mode: "conjugations",
 			difficulty: "hard",
-			random: () => LAST_RANDOM_VALUE,
+			randomNumber: () => LAST_RANDOM_VALUE,
 		})
 
-		assert.equal(prompt.targetConjugation, "causative passive desire negative past")
-		assert.deepEqual(validateConjugationPrompt(prompt, { difficulty: "hard" }), {
-			prompt: "She did not want to be made to go to school by the teacher.",
-			englishSentence: "She did not want to be made to go to school by the teacher.",
-			targetConjugation: "causative passive desire negative past",
-			japaneseTranslation: [
-				{ kanji: "彼女", kana: "かのじょ", particle: "は" },
-				{ kanji: "先生", kana: "せんせい", particle: "に" },
-				{ kanji: "学校", kana: "がっこう", particle: "に" },
-				{ kanji: "行く", kana: "いく" },
-			],
-		})
+		assert.equal(prompt.prompt, "My friend was made to go to the movie theater by the student.")
+		assert.equal(prompt.templateId, "causative_passive_destination")
+		assert.equal(prompt.gameProfile.vocabLevel, "medium")
+		assert.equal(prompt.gameProfile.sentenceComplexity, "complex")
+		assert.equal(prompt.gameProfile.conjugationLevel, "hard")
+		assert.deepEqual(prompt.japaneseTranslation, [
+			{ kanji: "友達", kana: "ともだち", particle: "は" },
+			{ kanji: "学生", kana: "がくせい", particle: "に" },
+			{ kanji: "映画館", kana: "えいがかん", particle: "に" },
+			{ kanji: "いく", kana: "いく" },
+		])
+		assert.doesNotThrow(() => validateConjugationPrompt(prompt))
 	})
 
-	it("keeps every local conjugation target valid for its difficulty", () => {
-		for (const [difficulty, targets] of Object.entries(CONJUGATION_TARGETS_BY_DIFFICULTY)) {
-			targets.forEach((target, index) => {
+	it("keeps sampled conjugation prompts as base-form Japanese chunks", () => {
+		for (const difficulty of ["easy", "medium", "hard"]) {
+			for (const randomValue of [0, 0.2, 0.4, 0.6, 0.8, LAST_RANDOM_VALUE]) {
 				const prompt = generateLocalGamePrompt({
 					mode: "conjugations",
 					difficulty,
-					random: () => (index + 0.1) / targets.length,
+					randomNumber: () => randomValue,
 				})
 
-				assert.equal(prompt.targetConjugation, target)
-				assert.doesNotThrow(() => validateConjugationPrompt(prompt, { difficulty }))
-			})
+				assert.equal(prompt.source, "local")
+				assert.equal(prompt.templateId.startsWith("conjugation_"), false)
+				assert.equal(Array.isArray(prompt.japaneseTranslation), true)
+				assert.notEqual(prompt.japaneseTranslation.length, 0)
+				assert.equal(
+					prompt.japaneseTranslation.some((wordData) =>
+						Object.hasOwn(wordData, "conjugation"),
+					),
+					false,
+				)
+				assert.doesNotThrow(() => validateConjugationPrompt(prompt))
+			}
 		}
+	})
+
+	it("keeps hard conjugation prompts on hard sentence profiles", () => {
+		const prompt = generateLocalGamePrompt({
+			mode: "conjugations",
+			difficulty: "hard",
+			randomNumber: () => FIRST_RANDOM_VALUE,
+		})
+
+		assert.equal(prompt.prompt, "Because it rained, I studied Japanese at school.")
+		assert.equal(prompt.templateId, "reason_clause_action")
+		assert.equal(prompt.gameProfile.vocabLevel, "medium")
+		assert.equal(prompt.gameProfile.sentenceComplexity, "complex")
+		assert.equal(prompt.gameProfile.conjugationLevel, "hard")
 	})
 
 	it("returns null for modes without a local generator", () => {
@@ -338,10 +384,10 @@ describe("generateLocalGamePrompt", () => {
 })
 
 describe("local prompt vocabulary", () => {
-	it("keeps every backend vocabulary word convertible by frontend dictionaries", () => {
+	it("keeps every backend vocabulary entry convertible by frontend dictionaries", () => {
 		const frontendElements = loadFrontendProcessedElements()
 
-		for (const [key, vocabularyWord] of Object.entries(LOCAL_VOCABULARY)) {
+		for (const [key, vocabularyWord] of Object.entries(LOCAL_PROMPT_VOCABULARY)) {
 			assert.equal(
 				frontendElements.some((element) =>
 					matchesFrontendElement(element, vocabularyWord.kanji, vocabularyWord.kana),
@@ -368,13 +414,13 @@ function countChangedWords(leftWords, rightWords) {
 }
 
 function generatedElementTypes(sentence) {
-	return sentence.japaneseTranslation.map((wordData) => LOCAL_VOCABULARY[wordData.key].type)
+	return sentence.japaneseTranslation.map((wordData) => LOCAL_PROMPT_VOCABULARY[wordData.key].type)
 }
 
 function loadFrontendProcessedElements() {
 	const frontendRootUrl = [
-		"../../../bb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
-		"../../../jsb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
+		"../../../../bb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
+		"../../../../jsb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
 	].find((candidatePath) => fs.existsSync(new URL(candidatePath, import.meta.url)))
 
 	if (!frontendRootUrl) {
