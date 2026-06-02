@@ -1,11 +1,11 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 import { HttpError } from "../errors.js"
-import { clearLocalGameChallenges } from "./localGameChallenges.js"
+import { clearGameChallenges } from "./gameChallengeStore.js"
 import {
 	checkGameAnswer,
 	checkSandboxSentence,
-	generateLocalGameAnswerFeedback,
+	generateChallengeAnswerFeedback,
 	generateGamePrompt,
 	getGameCheckInstructions,
 	validateConjugationPrompt,
@@ -113,7 +113,7 @@ describe("validateConjugationPrompt", () => {
 })
 
 describe("generateGamePrompt", () => {
-	it("uses local generation for all prompt game modes", async () => {
+	it("uses generated prompts for all prompt game modes", async () => {
 		for (const mode of [
 			"translate",
 			"conjugations",
@@ -123,16 +123,16 @@ describe("generateGamePrompt", () => {
 		]) {
 			const prompt = await generateGamePrompt({ mode, difficulty: "medium" })
 
-			assert.equal(prompt.source, "local")
+			assert.equal(prompt.source, "generated")
 			assert.equal(typeof prompt.prompt, "string")
 			assert.notEqual(prompt.prompt.length, 0)
 		}
 	})
 
-	it("uses local generation for translate prompts", async () => {
+	it("uses generated prompt data for translate prompts", async () => {
 		const prompt = await generateGamePrompt({ mode: "translate", difficulty: "easy" })
 
-		assert.equal(prompt.source, "local")
+		assert.equal(prompt.source, "generated")
 		assert.equal(typeof prompt.prompt, "string")
 		assert.match(prompt.prompt, /\.$/)
 		assert.equal(prompt.gameProfile.vocabLevel, "easy")
@@ -147,10 +147,10 @@ describe("generateGamePrompt", () => {
 		)
 	})
 
-	it("uses local generation for conjugation prompts", async () => {
+	it("uses generated prompt data for conjugation prompts", async () => {
 		const prompt = await generateGamePrompt({ mode: "conjugations", difficulty: "hard" })
 
-		assert.equal(prompt.source, "local")
+		assert.equal(prompt.source, "generated")
 		assert.equal(prompt.gameProfile.vocabLevel, "medium")
 		assert.equal(prompt.gameProfile.conjugationLevel, "hard")
 		assert.doesNotThrow(() => validateConjugationPrompt(prompt))
@@ -196,8 +196,8 @@ describe("getGameCheckInstructions", () => {
 })
 
 describe("checkGameAnswer", () => {
-	it("checks generated particle games locally without calling AI", async () => {
-		clearLocalGameChallenges()
+	it("checks generated particle games without calling AI", async () => {
+		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "particles",
 			difficulty: "easy",
@@ -223,7 +223,7 @@ describe("checkGameAnswer", () => {
 	})
 
 	it("checks generated conjugation games against the conjugated answer", async () => {
-		clearLocalGameChallenges()
+		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "conjugations",
 			difficulty: "easy",
@@ -266,7 +266,7 @@ describe("checkGameAnswer", () => {
 	})
 
 	it("uses AI checks for translate games and caches repeated challenge answers", async () => {
-		clearLocalGameChallenges()
+		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "translate",
 			difficulty: "easy",
@@ -295,8 +295,8 @@ describe("checkGameAnswer", () => {
 		assert.equal(calls.length, 1)
 	})
 
-	it("uses AI for incorrect generated-game feedback while keeping local correctness", async () => {
-		clearLocalGameChallenges()
+	it("uses AI for incorrect generated-game feedback while keeping generated correctness", async () => {
+		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "conjugations",
 			difficulty: "easy",
@@ -304,7 +304,7 @@ describe("checkGameAnswer", () => {
 		})
 		const calls = []
 
-		const result = await generateLocalGameAnswerFeedback(
+		const result = await generateChallengeAnswerFeedback(
 			{
 				mode: "conjugations",
 				difficulty: "easy",
@@ -337,7 +337,7 @@ describe("checkGameAnswer", () => {
 	})
 
 	it("caches generated-game AI feedback by answer", async () => {
-		clearLocalGameChallenges()
+		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "conjugations",
 			difficulty: "easy",
@@ -358,8 +358,8 @@ describe("checkGameAnswer", () => {
 			},
 		}
 
-		const firstResult = await generateLocalGameAnswerFeedback(payload, options)
-		const secondResult = await generateLocalGameAnswerFeedback(payload, options)
+		const firstResult = await generateChallengeAnswerFeedback(payload, options)
+		const secondResult = await generateChallengeAnswerFeedback(payload, options)
 
 		assert.deepEqual(firstResult, {
 			correct: false,
@@ -370,7 +370,7 @@ describe("checkGameAnswer", () => {
 	})
 
 	it("falls back to AI when a generated challenge is no longer available", async () => {
-		clearLocalGameChallenges()
+		clearGameChallenges()
 		const calls = []
 		const result = await checkGameAnswer(
 			{

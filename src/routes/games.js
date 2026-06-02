@@ -16,10 +16,10 @@ import {
 } from "../services/gameStats.js"
 import {
 	checkGameAnswer,
-	checkGeneratedGameAnswerLocally,
+	checkGeneratedGameAnswer,
 	checkSandboxSentence,
 	generateGamePrompt,
-	generateLocalGameAnswerFeedback,
+	generateChallengeAnswerFeedback,
 } from "../services/games.js"
 import { getSessionByToken } from "../services/sessions.js"
 import { translateJapanese } from "../services/translate.js"
@@ -86,25 +86,25 @@ router.post(
 	validateBody(gameCheckSchema),
 	asyncHandler(async (req, res) => {
 		const { answer, challengeId, difficulty, mode, prompt } = req.validated.body
-		const localResult = checkGeneratedGameAnswerLocally(req.validated.body)
+		const generatedResult = checkGeneratedGameAnswer(req.validated.body)
 
-		if (localResult) {
+		if (generatedResult) {
 			res.status(200).send(
-				localResult.correct
-					? localResult
+				generatedResult.correct
+					? generatedResult
 					: {
-							...localResult,
+							...generatedResult,
 							feedback: "",
 							feedbackPending: true,
 						},
 			)
-			recordLocalCheckInBackground(req, {
+			recordGeneratedCheckInBackground(req, {
 				challengeId,
 				mode,
 				difficulty,
 				prompt,
 				answer,
-				result: localResult,
+				result: generatedResult,
 			})
 			return
 		}
@@ -145,7 +145,7 @@ router.post(
 
 		await assertCanUseChallengeCheck(currentUser.id, challengeId)
 
-		const result = await generateLocalGameAnswerFeedback(req.validated.body)
+		const result = await generateChallengeAnswerFeedback(req.validated.body)
 		if (!result) {
 			throw new HttpError(404, "Feedback is not available for this challenge.", {
 				code: "CHALLENGE_FEEDBACK_NOT_AVAILABLE",
@@ -191,7 +191,7 @@ async function recordResultAndGetQuota(
 	return getUserGameQuota(userId)
 }
 
-function recordLocalCheckInBackground(
+function recordGeneratedCheckInBackground(
 	req,
 	{ challengeId, mode, difficulty, prompt, answer, result },
 ) {

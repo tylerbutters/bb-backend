@@ -1,4 +1,4 @@
-import { getPromptVocabularyEntry } from "./promptData/localVocabulary.js"
+import { getPromptVocabularyEntry } from "./promptData/promptVocabulary.js"
 
 const GODAN_ROWS = {
 	く: ["か", "き", "く", "け", "こ", "いて", "いた"],

@@ -1,4 +1,4 @@
-export const LOCAL_PROMPT_VOCABULARY = {
+export const PROMPT_VOCABULARY = {
 	i: {
 		kanji: "私",
 		kana: "わたし",
@@ -649,8 +649,8 @@ export const LOCAL_PROMPT_VOCABULARY = {
 }
 
 export function getPromptVocabularyEntry(key) {
-	const vocabularyEntry = LOCAL_PROMPT_VOCABULARY[key]
-	if (!vocabularyEntry) throw new Error(`Unknown local prompt vocabulary key: ${key}`)
+	const vocabularyEntry = PROMPT_VOCABULARY[key]
+	if (!vocabularyEntry) throw new Error(`Unknown prompt vocabulary key: ${key}`)
 
 	return vocabularyEntry
 }

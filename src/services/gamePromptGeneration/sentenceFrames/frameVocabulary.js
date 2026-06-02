@@ -1,4 +1,4 @@
-// These lists contain keys from promptData/localVocabulary.js.
+// These lists contain keys from promptData/promptVocabulary.js.
 export const SUBJECT_KEYS = [
 	"i",
 	"he",

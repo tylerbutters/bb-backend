@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { afterEach, describe, it } from "node:test"
 import app from "../app.js"
 import { db } from "../db.js"
-import { clearLocalGameChallenges } from "../services/localGameChallenges.js"
+import { clearGameChallenges } from "../services/gameChallengeStore.js"
 import { generateGamePrompt } from "../services/games.js"
 import { SESSION_COOKIE_NAME, hashSessionToken } from "../services/sessions.js"
 
@@ -121,8 +121,8 @@ afterEach(() => {
 })
 
 describe("game routes", () => {
-	it("returns generated local check results without waiting for auth, quota, or AI", async () => {
-		clearLocalGameChallenges()
+	it("returns generated check results without waiting for auth, quota, or AI", async () => {
+		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "particles",
 			difficulty: "easy",
@@ -150,8 +150,8 @@ describe("game routes", () => {
 		})
 	})
 
-	it("still requires login when a challenge cannot be checked locally", async () => {
-		clearLocalGameChallenges()
+	it("still requires login when a challenge cannot be checked from a saved challenge", async () => {
+		clearGameChallenges()
 
 		await withServer(async (baseUrl) => {
 			const response = await fetch(`${baseUrl}/api/v1/games/check`, {
@@ -174,8 +174,8 @@ describe("game routes", () => {
 		})
 	})
 
-	it("returns incorrect local results immediately and loads feedback separately", async () => {
-		clearLocalGameChallenges()
+	it("returns incorrect generated results immediately and loads feedback separately", async () => {
+		clearGameChallenges()
 		delete process.env.OPENAI_API_KEY
 		console.log = () => {}
 		const sessionToken = "plain-session-token"

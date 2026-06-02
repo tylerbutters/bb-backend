@@ -1,4 +1,4 @@
-import { getPromptVocabularyEntry } from "../promptData/localVocabulary.js"
+import { getPromptVocabularyEntry } from "../promptData/promptVocabulary.js"
 import { buildConjugatedWordChunk, buildWordChunk } from "../promptData/wordChunks.js"
 
 const DIFFICULTY_ORDER = ["easy", "medium", "hard"]

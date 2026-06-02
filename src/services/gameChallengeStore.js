@@ -1,9 +1,9 @@
 const CHALLENGE_TTL_MS = 60 * 60 * 1000
 const MAX_CHALLENGES = 1000
 
-const localGameChallenges = new Map()
+const gameChallengeStore = new Map()
 
-export function saveLocalGameChallenge({
+export function saveGameChallenge({
 	challengeId,
 	mode,
 	difficulty,
@@ -31,20 +31,20 @@ export function saveLocalGameChallenge({
 		expiresAt: Date.now() + CHALLENGE_TTL_MS,
 	}
 
-	localGameChallenges.set(challengeId, challenge)
+	gameChallengeStore.set(challengeId, challenge)
 	trimOldestChallenges()
 
 	return challenge
 }
 
-export function findLocalGameChallenge({ challengeId, mode, difficulty, prompt }) {
+export function findGameChallenge({ challengeId, mode, difficulty, prompt }) {
 	if (!challengeId) return null
 
-	const challenge = localGameChallenges.get(challengeId)
+	const challenge = gameChallengeStore.get(challengeId)
 	if (!challenge) return null
 
 	if (challenge.expiresAt <= Date.now()) {
-		localGameChallenges.delete(challengeId)
+		gameChallengeStore.delete(challengeId)
 		return null
 	}
 
@@ -55,46 +55,46 @@ export function findLocalGameChallenge({ challengeId, mode, difficulty, prompt }
 	return challenge
 }
 
-export function getCachedLocalGameChallengeResult(challenge, answerKey) {
+export function getCachedGameChallengeResult(challenge, answerKey) {
 	const cachedResult = challenge?.checkResultsByAnswer?.get(answerKey)
 	if (!cachedResult) return null
 
 	return { ...cachedResult }
 }
 
-export function cacheLocalGameChallengeResult(challenge, answerKey, result) {
+export function cacheGameChallengeResult(challenge, answerKey, result) {
 	challenge?.checkResultsByAnswer?.set(answerKey, { ...result })
 }
 
-export function getCachedLocalGameChallengeFeedback(challenge, answerKey) {
+export function getCachedGameChallengeFeedback(challenge, answerKey) {
 	const cachedResult = challenge?.feedbackResultsByAnswer?.get(answerKey)
 	if (!cachedResult) return null
 
 	return { ...cachedResult }
 }
 
-export function cacheLocalGameChallengeFeedback(challenge, answerKey, result) {
+export function cacheGameChallengeFeedback(challenge, answerKey, result) {
 	challenge?.feedbackResultsByAnswer?.set(answerKey, { ...result })
 }
 
-export function clearLocalGameChallenges() {
-	localGameChallenges.clear()
+export function clearGameChallenges() {
+	gameChallengeStore.clear()
 }
 
 function cleanupExpiredChallenges() {
 	const now = Date.now()
 
-	for (const [challengeId, challenge] of localGameChallenges) {
+	for (const [challengeId, challenge] of gameChallengeStore) {
 		if (challenge.expiresAt <= now) {
-			localGameChallenges.delete(challengeId)
+			gameChallengeStore.delete(challengeId)
 		}
 	}
 }
 
 function trimOldestChallenges() {
-	while (localGameChallenges.size > MAX_CHALLENGES) {
-		const oldestChallengeId = localGameChallenges.keys().next().value
-		localGameChallenges.delete(oldestChallengeId)
+	while (gameChallengeStore.size > MAX_CHALLENGES) {
+		const oldestChallengeId = gameChallengeStore.keys().next().value
+		gameChallengeStore.delete(oldestChallengeId)
 	}
 }
 

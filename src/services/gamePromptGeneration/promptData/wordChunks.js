@@ -1,4 +1,4 @@
-import { getPromptVocabularyEntry } from "./localVocabulary.js"
+import { getPromptVocabularyEntry } from "./promptVocabulary.js"
 
 export function buildWordChunk(key, particle, data = {}) {
 	const baseWord = getPromptVocabularyEntry(key)

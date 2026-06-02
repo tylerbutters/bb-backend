@@ -1,24 +1,24 @@
 import { randomUUID } from "node:crypto"
 import { HttpError } from "../errors.js"
 import { GAME_MODES } from "../gameModes.js"
-import { generateLocalGameChallenge } from "./localGamePromptGeneration/localGamePromptGenerator.js"
+import { generateGameChallengeContent } from "./gamePromptGeneration/gamePromptGenerator.js"
 import {
 	buildAcceptedJapaneseAnswerTexts,
 	buildJapaneseAnswerFeedbackParts,
 	buildJapaneseAnswerFeedbackText,
 	normalizeJapaneseAnswerText,
-} from "./localGamePromptGeneration/localAnswerText.js"
+} from "./gamePromptGeneration/answerText.js"
 import {
-	cacheLocalGameChallengeFeedback,
-	cacheLocalGameChallengeResult,
-	findLocalGameChallenge,
-	getCachedLocalGameChallengeFeedback,
-	getCachedLocalGameChallengeResult,
-	saveLocalGameChallenge,
-} from "./localGameChallenges.js"
+	cacheGameChallengeFeedback,
+	cacheGameChallengeResult,
+	findGameChallenge,
+	getCachedGameChallengeFeedback,
+	getCachedGameChallengeResult,
+	saveGameChallenge,
+} from "./gameChallengeStore.js"
 import { checkJapaneseGameAnswer, generateJapaneseGameFeedback } from "./sentences.js"
 
-const LOCAL_CHECK_FEEDBACK_BY_MODE = {
+const GENERATED_CHECK_FEEDBACK_BY_MODE = {
 	conjugations: (expectedAnswer) =>
 		`Correct sentence: ${expectedAnswer}. Check the conjugation on the target word.`,
 	"fix sentence": (expectedAnswer) =>
@@ -29,7 +29,7 @@ const LOCAL_CHECK_FEEDBACK_BY_MODE = {
 		`Correct order: ${expectedAnswer}. Keep the same chunks, but move them into this order.`,
 }
 
-const gameCheckInstructions = {
+const GAME_CHECK_INSTRUCTIONS = {
 	translate: [
 		"The prompt is an English sentence.",
 		"The answer is the learner's Japanese sentence.",
@@ -67,6 +67,14 @@ const gameCheckInstructions = {
 		"Do not mark incorrect or give feedback about particles, conjugation, vocabulary, or other non-order issues unless they make the word order impossible to identify.",
 	].join(" "),
 }
+
+const SANDBOX_CHECK_INSTRUCTIONS = [
+	"The prompt is only context; there is no target translation.",
+	"The answer is a standalone Japanese sentence built by a beginner learner.",
+	"Mark correct when the sentence is grammatical, natural enough, and understandable Japanese.",
+	"Do not mark incorrect only because punctuation is missing or because several natural phrasings are possible.",
+	"If incorrect, explain the main grammar or word-choice issue and suggest a concise fix.",
+].join(" ")
 
 const ATTACHED_PARTICLES = new Set([
 	"から",
@@ -177,7 +185,7 @@ function gameModeError(mode) {
 }
 
 export function getGameCheckInstructions(mode) {
-	const checkInstructions = gameCheckInstructions[mode]
+	const checkInstructions = GAME_CHECK_INSTRUCTIONS[mode]
 	if (!checkInstructions) throw gameModeError(mode)
 
 	return checkInstructions
@@ -188,38 +196,38 @@ export async function generateGamePrompt({
 	difficulty = "easy",
 	randomNumber = Math.random,
 }) {
-	const localChallenge = generateLocalGameChallenge({ mode, difficulty, randomNumber })
-	if (!localChallenge) throw gameModeError(mode)
+	const generatedChallenge = generateGameChallengeContent({ mode, difficulty, randomNumber })
+	if (!generatedChallenge) throw gameModeError(mode)
 
 	const challengeId = randomUUID()
-	const prompt = localChallenge.prompt
-	const expectedAnswers = buildAcceptedJapaneseAnswerTexts(
-		localChallenge.expectedJapaneseTranslation,
+	const promptData = generatedChallenge.prompt
+	const expectedAnswerData = buildExpectedAnswerData(
+		generatedChallenge.expectedJapaneseTranslation,
 	)
-	const expectedAnswerFeedbackText = buildJapaneseAnswerFeedbackText(
-		localChallenge.expectedJapaneseTranslation,
-	)
-	const expectedAnswerParts = buildJapaneseAnswerFeedbackParts(
-		localChallenge.expectedJapaneseTranslation,
-	)
-	const expectedAnswerKanaParts = buildJapaneseAnswerFeedbackParts(
-		localChallenge.expectedJapaneseTranslation,
-		"kana",
-	)
-	saveLocalGameChallenge({
+
+	saveGameChallenge({
 		challengeId,
 		mode,
 		difficulty,
-		prompt: prompt.prompt,
-		expectedAnswers,
-		expectedAnswerFeedbackText,
-		expectedAnswerParts,
-		expectedAnswerKanaParts,
+		prompt: promptData.prompt,
+		...expectedAnswerData,
 	})
 
 	return {
-		...prompt,
+		...promptData,
 		challengeId,
+	}
+}
+
+function buildExpectedAnswerData(expectedJapaneseTranslation) {
+	return {
+		expectedAnswers: buildAcceptedJapaneseAnswerTexts(expectedJapaneseTranslation),
+		expectedAnswerFeedbackText: buildJapaneseAnswerFeedbackText(expectedJapaneseTranslation),
+		expectedAnswerParts: buildJapaneseAnswerFeedbackParts(expectedJapaneseTranslation),
+		expectedAnswerKanaParts: buildJapaneseAnswerFeedbackParts(
+			expectedJapaneseTranslation,
+			"kana",
+		),
 	}
 }
 
@@ -228,23 +236,23 @@ export async function checkGameAnswer(
 	{ checkAnswer = checkJapaneseGameAnswer } = {},
 ) {
 	const checkInstructions = getGameCheckInstructions(mode)
-	const localResult = checkGeneratedGameAnswerLocally({
+	const generatedCheckResult = checkGeneratedGameAnswer({
 		mode,
 		prompt,
 		answer,
 		challengeId,
 		difficulty,
 	})
-	if (localResult) return localResult
+	if (generatedCheckResult) return generatedCheckResult
 
-	const { challenge, answerKey } = getGeneratedChallengeCheckData({
+	const { challenge, answerKey } = getSavedChallengeCheckData({
 		mode,
 		prompt,
 		answer,
 		challengeId,
 		difficulty,
 	})
-	const cachedResult = getCachedLocalGameChallengeResult(challenge, answerKey)
+	const cachedResult = getCachedGameChallengeResult(challenge, answerKey)
 	if (cachedResult) return cachedResult
 
 	const result = await checkAnswer({
@@ -254,20 +262,20 @@ export async function checkGameAnswer(
 		checkInstructions,
 	})
 	if (challenge) {
-		cacheLocalGameChallengeResult(challenge, answerKey, result)
+		cacheGameChallengeResult(challenge, answerKey, result)
 	}
 
 	return result
 }
 
-export function checkGeneratedGameAnswerLocally({
+export function checkGeneratedGameAnswer({
 	mode,
 	prompt,
 	answer,
 	challengeId,
 	difficulty = "easy",
 }) {
-	const { challenge, answerKey } = getGeneratedChallengeCheckData({
+	const { challenge, answerKey } = getSavedChallengeCheckData({
 		mode,
 		prompt,
 		answer,
@@ -276,23 +284,23 @@ export function checkGeneratedGameAnswerLocally({
 	})
 	if (!challenge?.expectedAnswers?.length) return null
 
-	const cachedResult = getCachedLocalGameChallengeResult(challenge, answerKey)
+	const cachedResult = getCachedGameChallengeResult(challenge, answerKey)
 	if (cachedResult) return cachedResult
 
-	const result = buildLocalGeneratedGameAnswerResult({ mode, answerKey, challenge })
+	const result = buildGeneratedGameAnswerResult({ mode, answerKey, challenge })
 	if (result.correct) {
-		cacheLocalGameChallengeResult(challenge, answerKey, result)
+		cacheGameChallengeResult(challenge, answerKey, result)
 	}
 
 	return result
 }
 
-export async function generateLocalGameAnswerFeedback(
+export async function generateChallengeAnswerFeedback(
 	{ mode, prompt, answer, challengeId, difficulty = "easy" },
 	{ generateFeedback = generateJapaneseGameFeedback } = {},
 ) {
 	const checkInstructions = getGameCheckInstructions(mode)
-	const { challenge, answerKey } = getGeneratedChallengeCheckData({
+	const { challenge, answerKey } = getSavedChallengeCheckData({
 		mode,
 		prompt,
 		answer,
@@ -301,16 +309,16 @@ export async function generateLocalGameAnswerFeedback(
 	})
 	if (!challenge?.expectedAnswers?.length) return null
 
-	const localResult = buildLocalGeneratedGameAnswerResult({ mode, answerKey, challenge })
-	if (localResult.correct) {
-		cacheLocalGameChallengeResult(challenge, answerKey, localResult)
-		return localResult
+	const generatedCheckResult = buildGeneratedGameAnswerResult({ mode, answerKey, challenge })
+	if (generatedCheckResult.correct) {
+		cacheGameChallengeResult(challenge, answerKey, generatedCheckResult)
+		return generatedCheckResult
 	}
 
-	const cachedFeedbackResult = getCachedLocalGameChallengeFeedback(challenge, answerKey)
+	const cachedFeedbackResult = getCachedGameChallengeFeedback(challenge, answerKey)
 	if (cachedFeedbackResult) return cachedFeedbackResult
 
-	const fallbackFeedback = localGeneratedGameFeedback(mode, challenge)
+	const fallbackFeedback = generatedGameFeedback(mode, challenge)
 
 	try {
 		const feedback = await generateFeedback({
@@ -318,7 +326,7 @@ export async function generateLocalGameAnswerFeedback(
 			prompt,
 			answer,
 			expectedAnswer: challenge.expectedAnswerFeedbackText || challenge.expectedAnswers[0],
-			answerDiff: buildLocalAnswerDiff({ answer, challenge }),
+			answerDiff: buildChallengeAnswerDiff({ answer, challenge }),
 			checkInstructions,
 		})
 		const result = {
@@ -326,9 +334,9 @@ export async function generateLocalGameAnswerFeedback(
 			feedback: feedback || fallbackFeedback,
 		}
 		if (feedback) {
-			cacheLocalGameChallengeFeedback(challenge, answerKey, result)
+			cacheGameChallengeFeedback(challenge, answerKey, result)
 		}
-		cacheLocalGameChallengeResult(challenge, answerKey, result)
+		cacheGameChallengeResult(challenge, answerKey, result)
 
 		return result
 	} catch (error) {
@@ -348,36 +356,30 @@ export async function checkSandboxSentence(
 		gameTitle: "sandbox sentence check",
 		prompt: "Evaluate the learner's standalone Japanese sentence.",
 		answer,
-		checkInstructions: [
-			"The prompt is only context; there is no target translation.",
-			"The answer is a standalone Japanese sentence built by a beginner learner.",
-			"Mark correct when the sentence is grammatical, natural enough, and understandable Japanese.",
-			"Do not mark incorrect only because punctuation is missing or because several natural phrasings are possible.",
-			"If incorrect, explain the main grammar or word-choice issue and suggest a concise fix.",
-		].join(" "),
+		checkInstructions: SANDBOX_CHECK_INSTRUCTIONS,
 	})
 }
 
-function buildLocalGeneratedGameAnswerResult({ mode, answerKey, challenge }) {
+function buildGeneratedGameAnswerResult({ mode, answerKey, challenge }) {
 	const normalizedExpectedAnswers = challenge.expectedAnswers.map(normalizeJapaneseAnswerText)
 	const correct = normalizedExpectedAnswers.includes(answerKey)
 
 	return {
 		correct,
-		feedback: correct ? "" : localGeneratedGameFeedback(mode, challenge),
+		feedback: correct ? "" : generatedGameFeedback(mode, challenge),
 	}
 }
 
-function getGeneratedChallengeCheckData({ mode, prompt, answer, challengeId, difficulty }) {
+function getSavedChallengeCheckData({ mode, prompt, answer, challengeId, difficulty }) {
 	return {
-		challenge: findLocalGameChallenge({ challengeId, mode, difficulty, prompt }),
+		challenge: findGameChallenge({ challengeId, mode, difficulty, prompt }),
 		answerKey: normalizeJapaneseAnswerText(answer),
 	}
 }
 
-function localGeneratedGameFeedback(mode, challenge) {
+function generatedGameFeedback(mode, challenge) {
 	const expectedAnswer = challenge.expectedAnswerFeedbackText || challenge.expectedAnswers[0]
-	const feedbackBuilder = LOCAL_CHECK_FEEDBACK_BY_MODE[mode]
+	const feedbackBuilder = GENERATED_CHECK_FEEDBACK_BY_MODE[mode]
 
 	if (expectedAnswer && feedbackBuilder) return feedbackBuilder(expectedAnswer)
 	if (expectedAnswer) return `Correct sentence: ${expectedAnswer}. Try again.`
@@ -385,7 +387,7 @@ function localGeneratedGameFeedback(mode, challenge) {
 	return "Try again."
 }
 
-function buildLocalAnswerDiff({ answer, challenge }) {
+function buildChallengeAnswerDiff({ answer, challenge }) {
 	const answerKey = normalizeJapaneseAnswerText(answer)
 	const expectedPartSet = selectExpectedPartSetForAnswer(answerKey, challenge)
 	const expectedParts = expectedPartSet.parts

@@ -34,7 +34,7 @@ export function generateSentenceGameChallenge({
 			: generateSentenceFromFrame({ difficulty, randomNumber })
 	const basePrompt = {
 		prompt: generatedSentence.prompt,
-		source: "local",
+		source: "generated",
 		templateId: generatedSentence.templateId,
 		gameProfile,
 	}

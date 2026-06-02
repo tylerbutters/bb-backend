@@ -11,7 +11,7 @@ const SENTENCE_FRAME_GAME_MODES = new Set([
 	"reorder",
 ])
 
-// gameProfile describes the local content range used to build the prompt. It is returned
+// gameProfile describes the generated content range used to build the prompt. It is returned
 // with each prompt so callers can understand what vocabulary and grammar level was selected.
 export const GAME_CONTENT_PROFILES = {
 	translate: {
@@ -101,7 +101,7 @@ export const GAME_CONTENT_PROFILES = {
 	},
 }
 
-export function generateLocalGamePrompt({
+export function generateGamePromptContent({
 	mode,
 	difficulty = "easy",
 	randomNumber = Math.random,
@@ -120,7 +120,7 @@ export function generateLocalGamePrompt({
 
 // Includes server-only expected answer data. Routes should send only challenge.prompt
 // to the client and keep the expected answer data in backend storage.
-export function generateLocalGameChallenge({
+export function generateGameChallengeContent({
 	mode,
 	difficulty = "easy",
 	randomNumber = Math.random,

@@ -108,7 +108,7 @@ export async function generateJapaneseGameFeedback({
 			`You give beginner Japanese ${gameTitle} feedback.`,
 			checkInstructions,
 			"The app has already determined this answer is incorrect.",
-			"The input includes the expected answer and a local diff of the likely mistake.",
+			"The input includes the expected answer and an answer diff of the likely mistake.",
 			"Return only the feedback sentence as plain text.",
 			"Do not return JSON, markdown, labels, or extra commentary.",
 			"Give one concise, actionable explanation in English.",
