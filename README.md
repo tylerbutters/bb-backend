@@ -10,8 +10,8 @@ The backend uses server-managed sessions instead of trusting the browser to deci
 - Only a SHA-256 hash of the token is stored in the `user_sessions` table.
 - The raw token is sent to the browser in the `bb_session` cookie.
 - The cookie is `HttpOnly`, so frontend JavaScript cannot read it.
-- The cookie is `SameSite=Lax`, which helps reduce cross-site request abuse.
-- In production, the cookie is also `Secure`, so it is only sent over HTTPS.
+- The cookie is `SameSite=Lax` in development.
+- In production, the cookie defaults to `SameSite=None` and `Secure` so the browser can send it when the frontend calls a separate API domain over HTTPS.
 - Logout revokes the current session and clears the cookie.
 
 Run the latest migration before using session auth:
@@ -49,6 +49,7 @@ The API uses:
 
 - `CLIENT_URL` should be set to the production frontend URL.
 - `NODE_ENV=production` enables production cookie behavior.
+- `SESSION_COOKIE_SAME_SITE` can be set to `lax`, `strict`, or `none` to override the session cookie `SameSite` value. Use `none` when the production frontend and API are on different sites.
 - `FREE_DAILY_CHALLENGE_LIMIT` controls how many challenge checks a free account gets per UTC day. It defaults to `15`.
 - `SUGGESTIONS_TO_ADDRESS` can be set to the inbox that receives anonymous suggestions. When it is not set, suggestions are sent to `ZOHO_FROM_ADDRESS`.
 - `TRUST_PROXY` should be set when running behind a trusted proxy or platform load balancer.

@@ -8,6 +8,7 @@ import {
 import { applyAdminEmailBootstrap } from "../services/users.js"
 
 const SESSION_MAX_AGE_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000
+const VALID_SESSION_COOKIE_SAME_SITE_VALUES = new Set(["lax", "strict", "none"])
 
 function decodeCookieValue(value) {
 	try {
@@ -39,13 +40,28 @@ export function getSessionToken(req) {
 	return parseCookies(req.headers.cookie)[SESSION_COOKIE_NAME] || null
 }
 
-function sessionCookieOptions(overrides = {}) {
+function getDefaultSessionCookieSameSite() {
+	return process.env.NODE_ENV === "production" ? "none" : "lax"
+}
+
+function getSessionCookieSameSite() {
+	const configuredSameSite = process.env.SESSION_COOKIE_SAME_SITE?.trim().toLowerCase()
+	if (!configuredSameSite) return getDefaultSessionCookieSameSite()
+
+	return VALID_SESSION_COOKIE_SAME_SITE_VALUES.has(configuredSameSite)
+		? configuredSameSite
+		: getDefaultSessionCookieSameSite()
+}
+
+export function sessionCookieOptions(overrides = {}) {
+	const sameSite = getSessionCookieSameSite()
+
 	return {
 		httpOnly: true,
 		maxAge: SESSION_MAX_AGE_MS,
 		path: "/",
-		sameSite: "lax",
-		secure: process.env.NODE_ENV === "production",
+		sameSite,
+		secure: process.env.NODE_ENV === "production" || sameSite === "none",
 		...overrides,
 	}
 }

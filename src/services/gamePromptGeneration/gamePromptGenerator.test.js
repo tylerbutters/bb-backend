@@ -490,12 +490,9 @@ function generatedElementTypes(sentence) {
 }
 
 function loadFrontendProcessedElements() {
-	const frontendRootUrl = [
-		"../../../../bb-frontend/src/pages/sentence-builder/jmdict/processed/",
-		"../../../../jsb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
-	].find((candidatePath) => fs.existsSync(new URL(candidatePath, import.meta.url)))
+	const frontendRootUrl = "../../../../bb-frontend/src/pages/sentence-builder/jmdict/processed/"
 
-	if (!frontendRootUrl) {
+	if (!fs.existsSync(new URL(frontendRootUrl, import.meta.url))) {
 		throw new Error("Could not find frontend processed dictionaries")
 	}
 

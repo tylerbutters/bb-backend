@@ -1,6 +1,14 @@
 import assert from "node:assert/strict"
-import { describe, it } from "node:test"
-import { requireAdmin } from "./auth.js"
+import { afterEach, describe, it } from "node:test"
+import { requireAdmin, sessionCookieOptions } from "./auth.js"
+
+const originalNodeEnv = process.env.NODE_ENV
+const originalSessionCookieSameSite = process.env.SESSION_COOKIE_SAME_SITE
+
+afterEach(() => {
+	restoreEnv("NODE_ENV", originalNodeEnv)
+	restoreEnv("SESSION_COOKIE_SAME_SITE", originalSessionCookieSameSite)
+})
 
 describe("requireAdmin", () => {
 	it("rejects unauthenticated requests with 401", () => {
@@ -35,3 +43,44 @@ describe("requireAdmin", () => {
 		assert.equal(nextCalled, true)
 	})
 })
+
+describe("sessionCookieOptions", () => {
+	it("uses lax cookies by default outside production", () => {
+		process.env.NODE_ENV = "test"
+		delete process.env.SESSION_COOKIE_SAME_SITE
+
+		const options = sessionCookieOptions()
+
+		assert.equal(options.sameSite, "lax")
+		assert.equal(options.secure, false)
+	})
+
+	it("uses secure cross-site cookies in production", () => {
+		process.env.NODE_ENV = "production"
+		delete process.env.SESSION_COOKIE_SAME_SITE
+
+		const options = sessionCookieOptions()
+
+		assert.equal(options.sameSite, "none")
+		assert.equal(options.secure, true)
+	})
+
+	it("allows same-site behavior to be overridden", () => {
+		process.env.NODE_ENV = "production"
+		process.env.SESSION_COOKIE_SAME_SITE = "lax"
+
+		const options = sessionCookieOptions()
+
+		assert.equal(options.sameSite, "lax")
+		assert.equal(options.secure, true)
+	})
+})
+
+function restoreEnv(key, value) {
+	if (value === undefined) {
+		delete process.env[key]
+		return
+	}
+
+	process.env[key] = value
+}
