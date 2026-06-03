@@ -9,6 +9,7 @@ import healthRouter from "./routes/health.js"
 import suggestionsRouter from "./routes/suggestions.js"
 import usersRouter from "./routes/users.js"
 import { apiRateLimiter } from "./middleware/rateLimiters.js"
+import { requestLogger } from "./middleware/requestLogger.js"
 
 const app = express()
 const apiRoot = "/api/v1"
@@ -22,6 +23,7 @@ if (process.env.TRUST_PROXY) {
 }
 
 app.disable("x-powered-by")
+app.use(requestLogger)
 
 function isLocalDevelopmentOrigin(origin) {
 	if (process.env.NODE_ENV === "production") return false

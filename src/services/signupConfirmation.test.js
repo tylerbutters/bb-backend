@@ -96,6 +96,7 @@ describe("signup confirmation service", () => {
 	})
 
 	it("creates the user only when the confirmation code matches", async () => {
+		const sentSignupNotifications = []
 		const { calls, query } = createQueryStub({
 			signupConfirmation: {
 				id: 4,
@@ -110,6 +111,7 @@ describe("signup confirmation service", () => {
 		const service = createSignupConfirmationService({
 			query,
 			verifyValue: async (value, hash) => value === "123456" && hash === "hash:123456",
+			sendSignupNotification: async (message) => sentSignupNotifications.push(message),
 			now: () => new Date("2029-01-01T00:00:00.000Z"),
 		})
 
@@ -127,6 +129,15 @@ describe("signup confirmation service", () => {
 				},
 			},
 		)
+		assert.deepEqual(sentSignupNotifications, [
+			{
+				user: {
+					id: 21,
+					email: "user@example.com",
+					displayName: "User",
+				},
+			},
+		])
 		assert.equal(
 			calls.some(
 				(call) =>
@@ -145,6 +156,40 @@ describe("signup confirmation service", () => {
 			),
 			true,
 		)
+	})
+
+	it("still creates the user when the support signup notification fails", async () => {
+		const loggedErrors = []
+		const { query } = createQueryStub({
+			signupConfirmation: {
+				id: 4,
+				email: "user@example.com",
+				displayName: "User",
+				passwordHash: "hash:password1",
+				codeHash: "hash:123456",
+				expiresAt: "2030-01-01T00:00:00.000Z",
+				attemptCount: 0,
+			},
+		})
+		const service = createSignupConfirmationService({
+			query,
+			verifyValue: async (value, hash) => value === "123456" && hash === "hash:123456",
+			sendSignupNotification: async () => {
+				throw new Error("Notification failed.")
+			},
+			logSignupNotificationError: (error) => loggedErrors.push(error),
+			now: () => new Date("2029-01-01T00:00:00.000Z"),
+		})
+
+		const result = await service.confirmSignup({
+			email: "user@example.com",
+			code: "123456",
+		})
+
+		assert.equal(result.message, SIGNUP_CONFIRMATION_SUCCESS_MESSAGE)
+		assert.equal(result.user.email, "user@example.com")
+		assert.equal(loggedErrors.length, 1)
+		assert.equal(loggedErrors[0].message, "Notification failed.")
 	})
 
 	it("increments attempts and rejects a wrong code", async () => {

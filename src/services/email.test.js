@@ -4,6 +4,7 @@ import { HttpError } from "../errors.js"
 import {
 	sendPasswordResetCode,
 	sendSignupConfirmationCode,
+	sendSignupNotificationEmail,
 	sendSuggestionEmail,
 } from "./email.js"
 
@@ -152,6 +153,49 @@ describe("sendPasswordResetCode", () => {
 			subject: "Your Bunsho Builder confirmation code",
 			content:
 				"Use this code to confirm your email and finish creating your account:\n\n123456\n\nThis code expires in 10 minutes. If you did not request it, you can ignore this email.",
+			mailFormat: "plaintext",
+			askReceipt: "no",
+			encoding: "UTF-8",
+		})
+	})
+
+	it("sends a signup notification email to support through the Mail API", async () => {
+		setZohoEnv()
+
+		const calls = []
+		globalThis.fetch = async (url, options) => {
+			calls.push({ url, options })
+
+			if (url === "https://accounts.zoho.com.au/oauth/v2/token") {
+				return new Response(JSON.stringify({ access_token: "access-token" }), {
+					status: 200,
+					headers: { "content-type": "application/json" },
+				})
+			}
+
+			return new Response(JSON.stringify({ status: { code: 200 } }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			})
+		}
+
+		await sendSignupNotificationEmail({
+			user: {
+				id: 21,
+				email: "user@example.com",
+				displayName: "User",
+				createdAt: "2026-06-03T01:23:45.000Z",
+			},
+		})
+
+		assert.equal(calls.length, 2)
+		const message = JSON.parse(calls[1].options.body)
+		assert.deepEqual(message, {
+			fromAddress: "no-reply@bunshobuilder.com",
+			toAddress: "support@bunshobuilder.com",
+			subject: "New Bunsho Builder signup",
+			content:
+				"New Bunsho Builder signup:\n\nDisplay name: User\nEmail: user@example.com\nUser ID: 21\nCreated at: 2026-06-03T01:23:45.000Z",
 			mailFormat: "plaintext",
 			askReceipt: "no",
 			encoding: "UTF-8",

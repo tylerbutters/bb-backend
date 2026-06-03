@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto"
 import { db } from "../db.js"
 import { HttpError } from "../errors.js"
-import { sendSignupConfirmationCode } from "./email.js"
+import { sendSignupConfirmationCode, sendSignupNotificationEmail } from "./email.js"
 import { hashPassword, verifyPassword } from "./password.js"
 
 export const SIGNUP_CONFIRMATION_REQUEST_MESSAGE =
@@ -35,9 +35,20 @@ const publicUserFields = `
 	id, email, display_name AS "displayName", plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
 `
 
+function logSignupEvent(event, fields = {}) {
+	const details = Object.entries(fields)
+		.filter(([, value]) => value !== undefined && value !== null && value !== "")
+		.map(([key, value]) => `${key}=${value}`)
+		.join(" ")
+
+	console.info(`[signup] ${event}${details ? ` ${details}` : ""}`)
+}
+
 export function createSignupConfirmationService({
 	query = (sql, params) => db.query(sql, params),
 	sendCode = sendSignupConfirmationCode,
+	sendSignupNotification = sendSignupNotificationEmail,
+	logSignupNotificationError = console.error,
 	createCode = generateSignupConfirmationCode,
 	hashValue = hashPassword,
 	verifyValue = verifyPassword,
@@ -83,6 +94,7 @@ export function createSignupConfirmationService({
 		)
 
 		await sendCode({ email, code })
+		logSignupEvent("confirmation requested", { email })
 
 		return { message: SIGNUP_CONFIRMATION_REQUEST_MESSAGE }
 	}
@@ -156,6 +168,25 @@ export function createSignupConfirmationService({
 		`,
 			[email],
 		)
+		logSignupEvent("account created", {
+			userId: result.rows[0]?.id,
+			email: result.rows[0]?.email,
+		})
+
+		try {
+			await sendSignupNotification({ user: result.rows[0] })
+			logSignupEvent("support notification sent", {
+				userId: result.rows[0]?.id,
+				email: result.rows[0]?.email,
+			})
+		} catch (error) {
+			// Support notifications should not block a user after their account exists.
+			logSignupEvent("support notification failed", {
+				userId: result.rows[0]?.id,
+				email: result.rows[0]?.email,
+			})
+			logSignupNotificationError(error)
+		}
 
 		return {
 			message: SIGNUP_CONFIRMATION_SUCCESS_MESSAGE,

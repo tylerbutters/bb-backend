@@ -31,9 +31,10 @@ export function createErrorResponse(message, { code, details } = {}) {
 
 function logServerError(error, req) {
 	const requestLabel = req ? `${req.method} ${req.originalUrl}` : "request"
+	const requestId = req?.requestId ? ` [api:${req.requestId}]` : ""
 	const message = error.logMessage || error.message || "Unhandled request error"
 
-	console.error(`Unhandled ${requestLabel}: ${message}`)
+	console.error(`Unhandled ${requestLabel}${requestId}: ${message}`)
 
 	if (error.cause) {
 		console.error(error.cause)

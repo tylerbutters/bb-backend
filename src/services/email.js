@@ -10,6 +10,7 @@ const zohoConfigKeys = [
 const defaultZohoAccountsUrl = "https://accounts.zoho.com.au"
 const defaultZohoMailApiUrl = "https://mail.zoho.com.au"
 const defaultZohoTimeoutMs = 10_000
+const signupNotificationRecipientAddress = "support@bunshobuilder.com"
 
 function envValue(key) {
 	return process.env[key]?.trim()
@@ -240,6 +241,43 @@ export async function sendSignupConfirmationCode({ email, code }) {
 		].join("\n"),
 		emailContext,
 		operation: "send the signup confirmation email",
+	})
+}
+
+export async function sendSignupNotificationEmail({ user }) {
+	const emailContext = {
+		purpose: "Signup notification",
+		code: "SIGNUP_NOTIFICATION_EMAIL_SEND_FAILED",
+	}
+	const content = [
+		"New Bunsho Builder signup:",
+		"",
+		`Display name: ${user.displayName || "Unknown"}`,
+		`Email: ${user.email}`,
+		`User ID: ${user.id}`,
+		`Created at: ${user.createdAt || "Unknown"}`,
+	].join("\n")
+
+	if (!hasZohoConfig()) {
+		if (process.env.NODE_ENV === "production") {
+			throw createZohoConfigError({
+				purpose: "Signup notification",
+				code: "SIGNUP_NOTIFICATION_EMAIL_NOT_CONFIGURED",
+			})
+		}
+
+		console.info(
+			`${content}. Zoho email is not configured; missing env vars: ${getMissingZohoConfigKeys().join(", ")}`,
+		)
+		return
+	}
+
+	await sendZohoMail({
+		toAddress: signupNotificationRecipientAddress,
+		subject: "New Bunsho Builder signup",
+		content,
+		emailContext,
+		operation: "send the signup notification email",
 	})
 }
 

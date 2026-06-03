@@ -26,6 +26,19 @@ import { translateJapanese } from "../services/translate.js"
 
 const router = Router()
 
+function formatLogFields(fields) {
+	return Object.entries(fields)
+		.filter(([, value]) => value !== undefined && value !== null && value !== "")
+		.map(([key, value]) => `${key}=${value}`)
+		.join(" ")
+}
+
+function logGameEvent(event, fields = {}) {
+	const details = formatLogFields(fields)
+
+	console.info(`[games] ${event}${details ? ` ${details}` : ""}`)
+}
+
 async function sendJapaneseTranslation(req, res) {
 	const translation = await translateJapanese(req.validated.body.text)
 
@@ -49,7 +62,12 @@ async function getOptionalCurrentUser(req, res) {
 
 		return session.user
 	} catch (error) {
-		console.log(error)
+		console.warn(
+			`[games] optional session lookup failed ${formatLogFields({
+				requestId: req?.requestId,
+			})}`,
+			error,
+		)
 		return null
 	}
 }
@@ -72,6 +90,12 @@ router.get(
 						prompt: promptResult,
 					}
 				: promptResult
+		logGameEvent("prompt generated", {
+			requestId: req.requestId,
+			mode,
+			difficulty,
+			challengeId: promptData.challengeId,
+		})
 
 		res.status(200).json({
 			mode,
@@ -88,10 +112,24 @@ router.post(
 		const { answer, challengeId, difficulty, mode, prompt } = req.validated.body
 		const currentUser = await getOptionalCurrentUser(req, res)
 		if (!currentUser) {
+			logGameEvent("check blocked login required", {
+				requestId: req.requestId,
+				mode,
+				difficulty,
+				challengeId,
+			})
 			throw createLoginRequiredForChallengeChecksError()
 		}
 
-		await assertCanUseChallengeCheck(currentUser.id, challengeId)
+		const quotaBeforeCheck = await assertCanUseChallengeCheck(currentUser.id, challengeId)
+		logGameEvent("check allowed", {
+			requestId: req.requestId,
+			userId: currentUser.id,
+			mode,
+			difficulty,
+			challengeId,
+			remaining: quotaBeforeCheck.remaining,
+		})
 
 		const generatedResult = checkGeneratedGameAnswer(req.validated.body)
 
@@ -103,6 +141,16 @@ router.post(
 				prompt,
 				answer,
 				result: generatedResult,
+			})
+			logGameEvent("check completed", {
+				requestId: req.requestId,
+				userId: currentUser.id,
+				mode,
+				difficulty,
+				challengeId,
+				checker: "local",
+				correct: generatedResult.correct,
+				remaining: quota.remaining,
 			})
 
 			res.status(200).send(
@@ -130,6 +178,16 @@ router.post(
 			answer,
 			result,
 		})
+		logGameEvent("check completed", {
+			requestId: req.requestId,
+			userId: currentUser.id,
+			mode,
+			difficulty,
+			challengeId,
+			checker: "ai",
+			correct: result.correct,
+			remaining: quota.remaining,
+		})
 
 		res.status(200).send({
 			...result,
@@ -145,10 +203,24 @@ router.post(
 		const { answer, challengeId, difficulty, mode, prompt } = req.validated.body
 		const currentUser = await getOptionalCurrentUser(req, res)
 		if (!currentUser) {
+			logGameEvent("feedback blocked login required", {
+				requestId: req.requestId,
+				mode,
+				difficulty,
+				challengeId,
+			})
 			throw createLoginRequiredForChallengeChecksError()
 		}
 
-		await assertCanUseChallengeCheck(currentUser.id, challengeId)
+		const quotaBeforeFeedback = await assertCanUseChallengeCheck(currentUser.id, challengeId)
+		logGameEvent("feedback allowed", {
+			requestId: req.requestId,
+			userId: currentUser.id,
+			mode,
+			difficulty,
+			challengeId,
+			remaining: quotaBeforeFeedback.remaining,
+		})
 
 		const result = await generateChallengeAnswerFeedback(req.validated.body)
 		if (!result) {
@@ -170,6 +242,15 @@ router.post(
 			challengeId,
 			feedback: result.feedback,
 		})
+		logGameEvent("feedback completed", {
+			requestId: req.requestId,
+			userId: currentUser.id,
+			mode,
+			difficulty,
+			challengeId,
+			correct: result.correct,
+			remaining: quota.remaining,
+		})
 
 		res.status(200).send({
 			...result,
@@ -182,7 +263,7 @@ async function recordResultAndGetQuota(
 	userId,
 	{ challengeId, mode, difficulty, prompt, answer, result },
 ) {
-	await recordGameResult({
+	const didRecord = await recordGameResult({
 		userId,
 		challengeId,
 		mode,
@@ -192,8 +273,17 @@ async function recordResultAndGetQuota(
 		correct: result.correct,
 		feedback: result.feedback,
 	})
+	const quota = await getUserGameQuota(userId)
+	logGameEvent("result saved", {
+		userId,
+		mode,
+		difficulty,
+		challengeId,
+		recorded: didRecord,
+		remaining: quota.remaining,
+	})
 
-	return getUserGameQuota(userId)
+	return quota
 }
 
 router.post(
