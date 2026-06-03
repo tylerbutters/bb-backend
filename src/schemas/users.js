@@ -30,17 +30,6 @@ const currentPasswordSchema = Joi.string()
 
 export const createUserSchema = Joi.object({
 	email: emailSchema.required(),
-	displayName: Joi.string()
-		.trim()
-		.min(1)
-		.max(80)
-		.messages({
-			"string.min": "Display name is required",
-			"string.max": "Display name must be at most 80 characters",
-			"string.empty": "Display name is required",
-			"any.required": "Display name is required",
-		})
-		.required(),
 	password: passwordSchema.required(),
 })
 	.required()
@@ -100,11 +89,6 @@ export const gameHistoryQuerySchema = Joi.object({
 
 export const updateUserSchema = Joi.object({
 	email: emailSchema,
-	displayName: Joi.string().trim().min(1).max(80).messages({
-		"string.min": "Display name is required",
-		"string.max": "Display name must be at most 80 characters",
-		"string.empty": "Display name is required",
-	}),
 	currentPassword: Joi.when("password", {
 		is: Joi.exist(),
 		then: currentPasswordSchema.required(),
@@ -112,7 +96,7 @@ export const updateUserSchema = Joi.object({
 	}),
 	password: passwordSchema,
 })
-	.or("email", "displayName", "password")
+	.or("email", "password")
 	.required()
 	.messages({
 		"object.missing": "At least one account detail is required",

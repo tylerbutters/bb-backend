@@ -6,7 +6,7 @@ export const SESSION_TTL_DAYS = 30
 
 const SESSION_TTL_MS = SESSION_TTL_DAYS * 24 * 60 * 60 * 1000
 const publicUserFields = `
-	u.id, u.email, u.display_name AS "displayName", u.plan, u.role, u.created_at AS "createdAt", u.updated_at AS "updatedAt"
+	u.id, u.email, u.plan, u.role, u.created_at AS "createdAt", u.updated_at AS "updatedAt"
 `
 
 function createToken() {

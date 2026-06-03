@@ -32,7 +32,7 @@ function isExpired(expiresAt, now) {
 }
 
 const publicUserFields = `
-	id, email, display_name AS "displayName", plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
+	id, email, plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
 `
 
 function logSignupEvent(event, fields = {}) {
@@ -67,7 +67,7 @@ export function createSignupConfirmationService({
 		return result.rowCount > 0
 	}
 
-	async function requestSignupConfirmation({ email, displayName, password }) {
+	async function requestSignupConfirmation({ email, password }) {
 		if (await userExists(email)) {
 			throw createDuplicateUserEmailError()
 		}
@@ -87,10 +87,10 @@ export function createSignupConfirmationService({
 		await query(
 			`
 			INSERT INTO signup_confirmation_codes
-				(email, display_name, password_hash, code_hash, expires_at)
-			VALUES ($1, $2, $3, $4, NOW() + ($5 * INTERVAL '1 minute'))
+				(email, password_hash, code_hash, expires_at)
+			VALUES ($1, $2, $3, NOW() + ($4 * INTERVAL '1 minute'))
 		`,
-			[email, displayName, passwordHash, codeHash, SIGNUP_CODE_TTL_MINUTES],
+			[email, passwordHash, codeHash, SIGNUP_CODE_TTL_MINUTES],
 		)
 
 		await sendCode({ email, code })
@@ -104,7 +104,6 @@ export function createSignupConfirmationService({
 			`
 			SELECT id,
 				email,
-				display_name AS "displayName",
 				password_hash AS "passwordHash",
 				code_hash AS "codeHash",
 				expires_at AS "expiresAt",
@@ -152,11 +151,11 @@ export function createSignupConfirmationService({
 
 		const result = await query(
 			`
-			INSERT INTO users (email, display_name, password_hash)
-			VALUES ($1, $2, $3)
+			INSERT INTO users (email, password_hash)
+			VALUES ($1, $2)
 			RETURNING ${publicUserFields}
 		`,
-			[email, signupConfirmation.displayName, signupConfirmation.passwordHash],
+			[email, signupConfirmation.passwordHash],
 		)
 
 		await query(

@@ -183,7 +183,6 @@ describe("sendPasswordResetCode", () => {
 			user: {
 				id: 21,
 				email: "user@example.com",
-				displayName: "User",
 				createdAt: "2026-06-03T01:23:45.000Z",
 			},
 		})
@@ -195,7 +194,7 @@ describe("sendPasswordResetCode", () => {
 			toAddress: "support@bunshobuilder.com",
 			subject: "New Bunsho Builder signup",
 			content:
-				"New Bunsho Builder signup:\n\nDisplay name: User\nEmail: user@example.com\nUser ID: 21\nCreated at: 2026-06-03T01:23:45.000Z",
+				"New Bunsho Builder signup:\n\nEmail: user@example.com\nUser ID: 21\nCreated at: 2026-06-03T01:23:45.000Z",
 			mailFormat: "plaintext",
 			askReceipt: "no",
 			encoding: "UTF-8",

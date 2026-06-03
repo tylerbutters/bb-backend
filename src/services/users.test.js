@@ -16,7 +16,7 @@ afterEach(() => {
 
 function createUpdateUserQueryStub({
 	currentUser = { passwordHash: "hash:old-password1" },
-	updatedUser = { id: 1, email: "user@example.com", displayName: "User" },
+	updatedUser = { id: 1, email: "user@example.com" },
 } = {}) {
 	const calls = []
 	const query = async (sql, params = []) => {
@@ -57,7 +57,6 @@ describe("users service", () => {
 		const promotedUser = {
 			id: 7,
 			email: "admin@example.com",
-			displayName: "Admin",
 			plan: "free",
 			role: "admin",
 			createdAt: "2026-01-01T00:00:00.000Z",
@@ -91,7 +90,6 @@ describe("users service", () => {
 		const adminUser = {
 			id: 7,
 			email: "admin@example.com",
-			displayName: "Admin",
 			role: "admin",
 		}
 		const calls = []
@@ -121,13 +119,13 @@ describe("users service", () => {
 						value === "old-password1" && hash === "hash:old-password1",
 				},
 			),
-			{ id: 1, email: "user@example.com", displayName: "User" },
+			{ id: 1, email: "user@example.com" },
 		)
 
 		assert.equal(calls[0].sql.includes("SELECT password_hash"), true)
 		assert.equal(
 			calls.some(
-				(call) => call.sql.includes("UPDATE users") && call.params[2] === "hash:new-password2",
+				(call) => call.sql.includes("UPDATE users") && call.params[1] === "hash:new-password2",
 			),
 			true,
 		)
@@ -160,12 +158,12 @@ describe("users service", () => {
 
 	it("updates non-password account fields without checking the current password", async () => {
 		const { calls, query } = createUpdateUserQueryStub({
-			updatedUser: { id: 1, email: "next@example.com", displayName: "User" },
+			updatedUser: { id: 1, email: "next@example.com" },
 		})
 
 		assert.deepEqual(
 			await updateUser(1, { email: "next@example.com" }, { query }),
-			{ id: 1, email: "next@example.com", displayName: "User" },
+			{ id: 1, email: "next@example.com" },
 		)
 
 		assert.equal(calls.some((call) => call.sql.includes("SELECT password_hash")), false)

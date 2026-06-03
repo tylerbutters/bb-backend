@@ -7,7 +7,6 @@ function createAdminUser(overrides = {}) {
 	return {
 		id: 1,
 		email: "tyler@example.com",
-		displayName: "Tyler",
 		plan: "free",
 		role: "user",
 		createdAt: "2026-01-01T00:00:00.000Z",
@@ -17,7 +16,7 @@ function createAdminUser(overrides = {}) {
 }
 
 describe("admin service", () => {
-	it("lists users by email or display name with pagination", async () => {
+	it("lists users by email with pagination", async () => {
 		const users = [
 			createAdminUser({ id: 3, email: "three@example.com" }),
 			createAdminUser({ id: 2, email: "two@example.com" }),
@@ -30,7 +29,7 @@ describe("admin service", () => {
 				query: async (sql, params) => {
 					assert.match(sql, /FROM users/)
 					assert.match(sql, /email ILIKE \$1/)
-					assert.match(sql, /display_name ILIKE \$1/)
+					assert.doesNotMatch(sql, /display_name/)
 					assert.match(sql, /ORDER BY created_at DESC, id DESC/)
 					assert.deepEqual(params, ["%tyler%", 3, 4])
 

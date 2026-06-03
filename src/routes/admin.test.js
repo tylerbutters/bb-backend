@@ -11,7 +11,6 @@ function createUser(overrides = {}) {
 	return {
 		id: 1,
 		email: "admin@example.com",
-		displayName: "Admin",
 		plan: "free",
 		role: "admin",
 		createdAt: "2026-01-01T00:00:00.000Z",
@@ -105,7 +104,6 @@ describe("admin routes", () => {
 		const listedUser = createUser({
 			id: 2,
 			email: "tyler@example.com",
-			displayName: "Tyler",
 			role: "user",
 		})
 		const calls = []

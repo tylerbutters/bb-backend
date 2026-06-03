@@ -5,7 +5,7 @@ import { hashPassword, verifyPassword } from "./password.js"
 import { sendEmailChangeConfirmationEmail } from "./email.js"
 
 const publicUserFields = `
-	id, email, display_name AS "displayName", plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
+	id, email, plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
 `
 const EMAIL_CHANGE_TOKEN_EXPIRES_MINUTES = 30
 
@@ -60,15 +60,15 @@ function createUserNotFoundError() {
 	})
 }
 
-export async function createUser({ email, displayName, password }) {
+export async function createUser({ email, password }) {
 	const passwordHash = await hashPassword(password)
 	const result = await db.query(
 		`
-		INSERT INTO users (email, display_name, password_hash)
-		VALUES ($1, $2, $3)
+		INSERT INTO users (email, password_hash)
+		VALUES ($1, $2)
 		RETURNING ${publicUserFields}
 	`,
-		[email, displayName, passwordHash],
+		[email, passwordHash],
 	)
 
 	return result.rows[0]
@@ -125,7 +125,7 @@ function createInvalidCurrentPasswordError() {
 
 export async function updateUser(
 	userId,
-	{ email, displayName, currentPassword, password },
+	{ email, currentPassword, password },
 	{ query = db.query.bind(db), hashValue = hashPassword, verifyValue = verifyPassword } = {},
 ) {
 	let passwordHash = null
@@ -159,12 +159,11 @@ export async function updateUser(
 		`
 		UPDATE users
 		SET email = COALESCE($1, email),
-			display_name = COALESCE($2, display_name),
-			password_hash = COALESCE($3, password_hash)
-		WHERE id = $4
+			password_hash = COALESCE($2, password_hash)
+		WHERE id = $3
 		RETURNING ${publicUserFields}
 	`,
-		[email ?? null, displayName ?? null, passwordHash, userId],
+		[email ?? null, passwordHash, userId],
 	)
 
 	if (result.rowCount === 0) {

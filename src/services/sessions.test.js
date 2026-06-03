@@ -46,7 +46,6 @@ describe("session service", () => {
 		const sessionUser = {
 			id: 12,
 			email: "user@example.com",
-			displayName: "User",
 			plan: "free",
 			role: "user",
 			createdAt: "2026-01-01T00:00:00.000Z",

@@ -3,7 +3,7 @@ import { HttpError } from "../errors.js"
 import { getUserGameStats, PREMIUM_STATS_VISIBILITY } from "./gameStats.js"
 
 const adminUserFields = `
-	id, email, display_name AS "displayName", plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
+	id, email, plan, role, created_at AS "createdAt", updated_at AS "updatedAt"
 `
 
 function createUserNotFoundError() {
@@ -26,7 +26,6 @@ export async function listAdminUsers(
 		params.push(`%${trimmedQuery}%`)
 		whereClause = `
 		WHERE email ILIKE $1
-			OR display_name ILIKE $1
 		`
 	}
 

@@ -29,7 +29,6 @@ function createQueryStub({ existingUser, signupConfirmation, insertedUser } = {}
 					insertedUser || {
 						id: 21,
 						email: params[0],
-						displayName: params[1],
 					},
 				],
 				rowCount: 1,
@@ -56,7 +55,6 @@ describe("signup confirmation service", () => {
 		assert.deepEqual(
 			await service.requestSignupConfirmation({
 				email: "user@example.com",
-				displayName: "User",
 				password: "password1",
 			}),
 			{ message: SIGNUP_CONFIRMATION_REQUEST_MESSAGE },
@@ -83,7 +81,6 @@ describe("signup confirmation service", () => {
 			() =>
 				service.requestSignupConfirmation({
 					email: "user@example.com",
-					displayName: "User",
 					password: "password1",
 				}),
 			(error) => {
@@ -101,7 +98,6 @@ describe("signup confirmation service", () => {
 			signupConfirmation: {
 				id: 4,
 				email: "user@example.com",
-				displayName: "User",
 				passwordHash: "hash:password1",
 				codeHash: "hash:123456",
 				expiresAt: "2030-01-01T00:00:00.000Z",
@@ -125,7 +121,6 @@ describe("signup confirmation service", () => {
 				user: {
 					id: 21,
 					email: "user@example.com",
-					displayName: "User",
 				},
 			},
 		)
@@ -134,7 +129,6 @@ describe("signup confirmation service", () => {
 				user: {
 					id: 21,
 					email: "user@example.com",
-					displayName: "User",
 				},
 			},
 		])
@@ -143,8 +137,7 @@ describe("signup confirmation service", () => {
 				(call) =>
 					call.sql.includes("INSERT INTO users") &&
 					call.params[0] === "user@example.com" &&
-					call.params[1] === "User" &&
-					call.params[2] === "hash:password1",
+					call.params[1] === "hash:password1",
 			),
 			true,
 		)
@@ -164,7 +157,6 @@ describe("signup confirmation service", () => {
 			signupConfirmation: {
 				id: 4,
 				email: "user@example.com",
-				displayName: "User",
 				passwordHash: "hash:password1",
 				codeHash: "hash:123456",
 				expiresAt: "2030-01-01T00:00:00.000Z",
@@ -197,7 +189,6 @@ describe("signup confirmation service", () => {
 			signupConfirmation: {
 				id: 4,
 				email: "user@example.com",
-				displayName: "User",
 				passwordHash: "hash:password1",
 				codeHash: "hash:123456",
 				expiresAt: "2030-01-01T00:00:00.000Z",

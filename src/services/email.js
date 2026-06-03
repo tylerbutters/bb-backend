@@ -252,7 +252,6 @@ export async function sendSignupNotificationEmail({ user }) {
 	const content = [
 		"New Bunsho Builder signup:",
 		"",
-		`Display name: ${user.displayName || "Unknown"}`,
 		`Email: ${user.email}`,
 		`User ID: ${user.id}`,
 		`Created at: ${user.createdAt || "Unknown"}`,
