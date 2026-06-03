@@ -1,13 +1,29 @@
 import assert from "node:assert/strict"
-import { describe, it } from "node:test"
+import { afterEach, beforeEach, describe, it } from "node:test"
 import {
 	assertCanUseChallengeCheck,
+	getFreeDailyChallengeLimit,
 	getUserGameHistory,
 	getUserGameQuota,
 	getUserGameStats,
 	recordGameResult,
 	updateGameResultFeedback,
 } from "./gameStats.js"
+
+const originalFreeDailyChallengeLimit = process.env.FREE_DAILY_CHALLENGE_LIMIT
+
+beforeEach(() => {
+	delete process.env.FREE_DAILY_CHALLENGE_LIMIT
+})
+
+afterEach(() => {
+	if (originalFreeDailyChallengeLimit === undefined) {
+		delete process.env.FREE_DAILY_CHALLENGE_LIMIT
+		return
+	}
+
+	process.env.FREE_DAILY_CHALLENGE_LIMIT = originalFreeDailyChallengeLimit
+})
 
 describe("recordGameResult", () => {
 	it("records the first result for a challenge", async () => {
@@ -362,7 +378,38 @@ describe("getUserGameStats", () => {
 })
 
 describe("getUserGameQuota", () => {
-	it("returns unlimited quota fields while premium limits are disabled", async () => {
+	it("reads the free daily quota from the environment", async () => {
+		process.env.FREE_DAILY_CHALLENGE_LIMIT = "7"
+
+		const quota = await getUserGameQuota(12, {
+			now: new Date("2026-05-28T13:15:00.000Z"),
+			query: async (sql) => {
+				if (sql.includes("SELECT plan")) {
+					return { rowCount: 1, rows: [{ plan: "free" }] }
+				}
+
+				return { rowCount: 1, rows: [{ used: "2" }] }
+			},
+		})
+
+		assert.equal(getFreeDailyChallengeLimit(), 7)
+		assert.deepEqual(quota, {
+			plan: "free",
+			limit: 7,
+			used: 2,
+			remaining: 5,
+			resetsAt: "2026-05-29T00:00:00.000Z",
+			canPlay: true,
+		})
+	})
+
+	it("falls back to the default quota when the environment value is invalid", () => {
+		process.env.FREE_DAILY_CHALLENGE_LIMIT = "not-a-number"
+
+		assert.equal(getFreeDailyChallengeLimit(), 15)
+	})
+
+	it("returns finite daily quota fields for free users", async () => {
 		const quota = await getUserGameQuota(12, {
 			now: new Date("2026-05-28T13:15:00.000Z"),
 			query: async (sql, params) => {
@@ -383,9 +430,9 @@ describe("getUserGameQuota", () => {
 
 		assert.deepEqual(quota, {
 			plan: "free",
-			limit: null,
+			limit: 15,
 			used: 1,
-			remaining: null,
+			remaining: 14,
 			resetsAt: "2026-05-29T00:00:00.000Z",
 			canPlay: true,
 		})
@@ -415,7 +462,39 @@ describe("getUserGameQuota", () => {
 })
 
 describe("assertCanUseChallengeCheck", () => {
-	it("allows new free checks after the old daily limit while premium limits are disabled", async () => {
+	it("rejects new free checks after the daily limit", async () => {
+		await assert.rejects(
+			assertCanUseChallengeCheck(12, "1e5eb8e7-f91a-4c61-8f37-62b1a27ddf95", {
+				now: new Date("2026-05-28T13:15:00.000Z"),
+				query: async (sql) => {
+					if (sql.includes("FROM user_game_results") && sql.includes("LIMIT 1")) {
+						return { rowCount: 0, rows: [] }
+					}
+
+					if (sql.includes("SELECT plan")) {
+						return { rowCount: 1, rows: [{ plan: "free" }] }
+					}
+
+					return { rowCount: 1, rows: [{ used: "15" }] }
+				},
+			}),
+			(error) => {
+				assert.equal(error.status, 403)
+				assert.equal(error.code, "DAILY_GAME_LIMIT_REACHED")
+				assert.deepEqual(error.details.quota, {
+					plan: "free",
+					limit: 15,
+					used: 15,
+					remaining: 0,
+					resetsAt: "2026-05-29T00:00:00.000Z",
+					canPlay: false,
+				})
+				return true
+			},
+		)
+	})
+
+	it("allows new free checks before the daily limit", async () => {
 		const quota = await assertCanUseChallengeCheck(12, "1e5eb8e7-f91a-4c61-8f37-62b1a27ddf95", {
 			now: new Date("2026-05-28T13:15:00.000Z"),
 			query: async (sql) => {
@@ -427,15 +506,15 @@ describe("assertCanUseChallengeCheck", () => {
 					return { rowCount: 1, rows: [{ plan: "free" }] }
 				}
 
-				return { rowCount: 1, rows: [{ used: "3" }] }
+				return { rowCount: 1, rows: [{ used: "14" }] }
 			},
 		})
 
 		assert.deepEqual(quota, {
 			plan: "free",
-			limit: null,
-			used: 3,
-			remaining: null,
+			limit: 15,
+			used: 14,
+			remaining: 1,
 			resetsAt: "2026-05-29T00:00:00.000Z",
 			canPlay: true,
 		})
@@ -458,6 +537,6 @@ describe("assertCanUseChallengeCheck", () => {
 		})
 
 		assert.equal(quota.canPlay, true)
-		assert.equal(quota.remaining, null)
+		assert.equal(quota.remaining, 12)
 	})
 })

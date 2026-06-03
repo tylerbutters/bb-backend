@@ -491,7 +491,7 @@ function generatedElementTypes(sentence) {
 
 function loadFrontendProcessedElements() {
 	const frontendRootUrl = [
-		"../../../../bb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
+		"../../../../bb-frontend/src/pages/sentence-builder/jmdict/processed/",
 		"../../../../jsb-frontend/src/pages/sentence-builder-page/jmdict/processed/",
 	].find((candidatePath) => fs.existsSync(new URL(candidatePath, import.meta.url)))
 

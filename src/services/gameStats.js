@@ -10,7 +10,7 @@ export const TRACKED_GAME_MODES = [
 ]
 export const GAME_DIFFICULTIES = ["easy", "medium", "hard"]
 export const GAME_STAT_FILTERS = ["all", ...GAME_DIFFICULTIES]
-export const FREE_DAILY_CHALLENGE_LIMIT = 3
+export const DEFAULT_FREE_DAILY_CHALLENGE_LIMIT = 15
 export const FREE_STATS_VISIBILITY = "today"
 export const PREMIUM_STATS_VISIBILITY = "all"
 
@@ -20,6 +20,14 @@ const trackedModeLabels = new Map(
 const validDifficulties = new Set(GAME_DIFFICULTIES)
 const PREMIUM_PLAN = "premium"
 
+export function getFreeDailyChallengeLimit() {
+	const configuredLimit = Number(process.env.FREE_DAILY_CHALLENGE_LIMIT)
+
+	return Number.isInteger(configuredLimit) && configuredLimit > 0
+		? configuredLimit
+		: DEFAULT_FREE_DAILY_CHALLENGE_LIMIT
+}
+
 function createUserNotFoundError() {
 	return new HttpError(404, "User not found.", {
 		code: "USER_NOT_FOUND",
@@ -27,9 +35,11 @@ function createUserNotFoundError() {
 }
 
 function createDailyLimitReachedError(quota) {
+	const dailyLimit = getFreeDailyChallengeLimit()
+
 	return new HttpError(
 		403,
-		`You've used today's ${FREE_DAILY_CHALLENGE_LIMIT} free challenge checks.`,
+		`You've used today's ${dailyLimit} challenge checks.`,
 		{
 			code: "DAILY_GAME_LIMIT_REACHED",
 			details: {
@@ -65,24 +75,19 @@ function statsVisibilityRange({ visibility = PREMIUM_STATS_VISIBILITY, now = new
 function createQuota({ plan, used, resetsAt }) {
 	const normalizedPlan = normalizePlan(plan)
 	const normalizedUsed = normalizeCount(used)
-
-	/*
-	TODO(premium): Re-enable finite free quotas when premium is live.
 	const isPremium = normalizedPlan === PREMIUM_PLAN
-	const remaining = isPremium
-		? null
-		: Math.max(FREE_DAILY_CHALLENGE_LIMIT - normalizedUsed, 0)
-	const limit = isPremium ? null : FREE_DAILY_CHALLENGE_LIMIT
+	const freeDailyChallengeLimit = getFreeDailyChallengeLimit()
+	const remaining = isPremium ? null : Math.max(freeDailyChallengeLimit - normalizedUsed, 0)
+	const limit = isPremium ? null : freeDailyChallengeLimit
 	const canPlay = isPremium || remaining > 0
-	*/
 
 	return {
 		plan: normalizedPlan,
-		limit: null,
+		limit,
 		used: normalizedUsed,
-		remaining: null,
+		remaining,
 		resetsAt: resetsAt.toISOString(),
-		canPlay: true,
+		canPlay,
 	}
 }
 
@@ -199,9 +204,7 @@ export async function assertCanUseChallengeCheck(
 
 	if (alreadyRecorded || quota.canPlay) return quota
 
-	// TODO(premium): Re-enable this rejection when free quota limits return.
-	// throw createDailyLimitReachedError(quota)
-	return quota
+	throw createDailyLimitReachedError(quota)
 }
 
 function normalizeDifficulty(difficulty) {

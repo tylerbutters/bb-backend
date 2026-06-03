@@ -121,7 +121,7 @@ afterEach(() => {
 })
 
 describe("game routes", () => {
-	it("returns generated check results without waiting for auth, quota, or AI", async () => {
+	it("requires login before returning generated check results", async () => {
 		clearGameChallenges()
 		const prompt = await generateGamePrompt({
 			mode: "particles",
@@ -145,13 +145,15 @@ describe("game routes", () => {
 			})
 			const result = await readResponse(response)
 
-			assert.equal(result.status, 200)
-			assert.deepEqual(result.body, { correct: true, feedback: "" })
+			assert.equal(result.status, 401)
+			assert.equal(result.body.error.code, "LOGIN_REQUIRED_FOR_CHALLENGE_CHECKS")
 		})
 	})
 
-	it("still requires login when a challenge cannot be checked from a saved challenge", async () => {
+	it("requires login when a challenge cannot be checked from a saved challenge", async () => {
 		clearGameChallenges()
+		delete process.env.OPENAI_API_KEY
+		console.log = () => {}
 
 		await withServer(async (baseUrl) => {
 			const response = await fetch(`${baseUrl}/api/v1/games/check`, {
@@ -174,7 +176,39 @@ describe("game routes", () => {
 		})
 	})
 
-	it("returns incorrect generated results immediately and loads feedback separately", async () => {
+	it("requires login before loading generated challenge feedback", async () => {
+		clearGameChallenges()
+		delete process.env.OPENAI_API_KEY
+		console.log = () => {}
+		const prompt = await generateGamePrompt({
+			mode: "conjugations",
+			difficulty: "easy",
+			randomNumber: () => 0,
+		})
+		const requestBody = {
+			mode: "conjugations",
+			difficulty: "easy",
+			prompt: prompt.prompt,
+			answer: "私は寿司を食べる",
+			challengeId: prompt.challengeId,
+		}
+
+		await withServer(async (baseUrl) => {
+			const response = await fetch(`${baseUrl}/api/v1/games/feedback`, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+				},
+				body: JSON.stringify(requestBody),
+			})
+			const result = await readResponse(response)
+
+			assert.equal(result.status, 401)
+			assert.equal(result.body.error.code, "LOGIN_REQUIRED_FOR_CHALLENGE_CHECKS")
+		})
+	})
+
+	it("returns incorrect generated results with quota and loads feedback separately", async () => {
 		clearGameChallenges()
 		delete process.env.OPENAI_API_KEY
 		console.log = () => {}
@@ -208,11 +242,11 @@ describe("game routes", () => {
 			assert.equal(checkResult.body.correct, false)
 			assert.equal(checkResult.body.feedback, "")
 			assert.equal(checkResult.body.feedbackPending, true)
-			assert.equal(Object.hasOwn(checkResult.body, "quota"), false)
-
-			await new Promise((resolve) => {
-				setImmediate(resolve)
-			})
+			assert.equal(checkResult.body.quota.used, 1)
+			assert.equal(
+				checkResult.body.quota.remaining,
+				checkResult.body.quota.limit - checkResult.body.quota.used,
+			)
 
 			const feedbackResponse = await fetch(`${baseUrl}/api/v1/games/feedback`, {
 				method: "POST",

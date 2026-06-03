@@ -49,6 +49,7 @@ The API uses:
 
 - `CLIENT_URL` should be set to the production frontend URL.
 - `NODE_ENV=production` enables production cookie behavior.
+- `FREE_DAILY_CHALLENGE_LIMIT` controls how many challenge checks a free account gets per UTC day. It defaults to `15`.
 - `SUGGESTIONS_TO_ADDRESS` can be set to the inbox that receives anonymous suggestions. When it is not set, suggestions are sent to `ZOHO_FROM_ADDRESS`.
 - `TRUST_PROXY` should be set when running behind a trusted proxy or platform load balancer.
 - Rate limits can be adjusted with:

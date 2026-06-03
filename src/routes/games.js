@@ -86,19 +86,17 @@ router.post(
 	validateBody(gameCheckSchema),
 	asyncHandler(async (req, res) => {
 		const { answer, challengeId, difficulty, mode, prompt } = req.validated.body
+		const currentUser = await getOptionalCurrentUser(req, res)
+		if (!currentUser) {
+			throw createLoginRequiredForChallengeChecksError()
+		}
+
+		await assertCanUseChallengeCheck(currentUser.id, challengeId)
+
 		const generatedResult = checkGeneratedGameAnswer(req.validated.body)
 
 		if (generatedResult) {
-			res.status(200).send(
-				generatedResult.correct
-					? generatedResult
-					: {
-							...generatedResult,
-							feedback: "",
-							feedbackPending: true,
-						},
-			)
-			recordGeneratedCheckInBackground(req, {
+			const quota = await recordResultAndGetQuota(currentUser.id, {
 				challengeId,
 				mode,
 				difficulty,
@@ -106,15 +104,22 @@ router.post(
 				answer,
 				result: generatedResult,
 			})
+
+			res.status(200).send(
+				generatedResult.correct
+					? {
+							...generatedResult,
+							quota,
+						}
+					: {
+							...generatedResult,
+							feedback: "",
+							feedbackPending: true,
+							quota,
+						},
+			)
 			return
 		}
-
-		const currentUser = await getOptionalCurrentUser(req, res)
-		if (!currentUser) {
-			throw createLoginRequiredForChallengeChecksError()
-		}
-
-		await assertCanUseChallengeCheck(currentUser.id, challengeId)
 
 		const result = await checkGameAnswer(req.validated.body)
 		const quota = await recordResultAndGetQuota(currentUser.id, {
@@ -189,31 +194,6 @@ async function recordResultAndGetQuota(
 	})
 
 	return getUserGameQuota(userId)
-}
-
-function recordGeneratedCheckInBackground(
-	req,
-	{ challengeId, mode, difficulty, prompt, answer, result },
-) {
-	setImmediate(async () => {
-		try {
-			const resolvedUserId = (await getOptionalCurrentUser(req))?.id
-			if (!resolvedUserId) return
-
-			await recordGameResult({
-				userId: resolvedUserId,
-				challengeId,
-				mode,
-				difficulty,
-				prompt,
-				answer,
-				correct: result.correct,
-				feedback: result.feedback,
-			})
-		} catch (error) {
-			console.log(error)
-		}
-	})
 }
 
 router.post(
