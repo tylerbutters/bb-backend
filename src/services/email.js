@@ -288,7 +288,6 @@ export async function sendEmailChangeConfirmationEmail({ currentEmail, newEmail,
 	}
 
 	const confirmUrl = `${process.env.CLIENT_URL}/confirm-email-change?token=${token}`
-	console.log(confirmUrl)
 	if (!hasZohoConfig()) {
 		if (process.env.NODE_ENV === "production") {
 			throw createZohoConfigError({
@@ -298,7 +297,7 @@ export async function sendEmailChangeConfirmationEmail({ currentEmail, newEmail,
 		}
 
 		console.info(
-			`Email change confirmation link for ${currentEmail}: ${confirmUrl}. Zoho email is not configured; missing env vars: ${getMissingZohoConfigKeys().join(", ")}`,
+			`Email change confirmation email for ${currentEmail} was not sent. Zoho email is not configured; missing env vars: ${getMissingZohoConfigKeys().join(", ")}`,
 		)
 		return
 	}

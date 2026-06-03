@@ -338,13 +338,16 @@ export async function generateChallengeAnswerFeedback(
 		}
 		cacheGameChallengeResult(challenge, answerKey, result)
 
-		return result
-	} catch (error) {
-		console.log(error)
-		return {
-			correct: false,
-			feedback: fallbackFeedback,
-		}
+			return result
+		} catch (error) {
+			const errorMessage = error?.message || "unknown error"
+			console.warn(
+				`[games] feedback generation failed; using fallback feedback (${errorMessage})`,
+			)
+			return {
+				correct: false,
+				feedback: fallbackFeedback,
+			}
 	}
 }
 
